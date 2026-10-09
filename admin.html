@@ -879,14 +879,18 @@ create policy "Allow public delete" on public.redirects
       try {
         const { data, error } = await client
           .from('redirects')
-          .select('*')
-          .order('created_at', { ascending: false });
+          .select('*');
 
         if (error) {
           throw error;
         }
 
-        cachedRedirects = data || [];
+        cachedRedirects = (data || []).sort((a, b) => {
+          if (a.created_at && b.created_at) {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }
+          return (a.id || '').localeCompare(b.id || '');
+        });
         renderTable();
         updateStats();
       } catch (err) {

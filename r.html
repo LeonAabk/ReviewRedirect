@@ -243,11 +243,12 @@
       const client = supabase.createClient(creds.url, creds.key);
 
       try {
-        // 2. Oppslag i 'redirects'-tabellen etter id
+        const cleanId = redirectId.trim();
+        // 2. Oppslag i 'redirects'-tabellen etter id (case-insensitive)
         const { data, error } = await client
           .from('redirects')
           .select('id, google_url, clicks')
-          .eq('id', redirectId)
+          .ilike('id', cleanId)
           .maybeSingle();
 
         if (error) {

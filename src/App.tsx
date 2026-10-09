@@ -562,7 +562,7 @@ export default function App() {
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     async function loadRedirects() {
-      const { data, error } = await client.from('redirects').select('*').order('created_at', { ascending: false });
+      const { data, error } = await client.from('redirects').select('*');
       const tbody = document.getElementById('table-body');
       if (error || !data || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:2rem;">Ingen oppføringer funnet.</td></tr>';
