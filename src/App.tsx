@@ -18,7 +18,13 @@ import {
   Download,
   Settings,
   X,
-  Sliders
+  Sliders,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 
 interface RedirectItem {
@@ -35,6 +41,13 @@ interface SupabaseConfig {
 }
 
 export default function App() {
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [enteredPassword, setEnteredPassword] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('admin');
+  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'nfc'>('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [redirects, setRedirects] = useState<RedirectItem[]>([]);
@@ -110,6 +123,12 @@ export default function App() {
           customDomain: customDomain || ''
         });
       }
+
+      // Last admin-passord og sesjonsstatus
+      const savedPassword = localStorage.getItem('admin_password') || 'admin';
+      setAdminPassword(savedPassword);
+      const isSessionUnlocked = sessionStorage.getItem('dashboard_unlocked') === 'true';
+      setIsUnlocked(isSessionUnlocked);
     } catch (e) {
       console.error(e);
     }
@@ -274,7 +293,31 @@ export default function App() {
     } else {
       localStorage.removeItem('custom_domain');
     }
+    if (adminPassword) {
+      localStorage.setItem('admin_password', adminPassword.trim());
+    }
     showToast('Innstillinger lagret!');
+  };
+
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    const currentPassword = localStorage.getItem('admin_password') || 'admin';
+    if (enteredPassword.trim() === currentPassword.trim()) {
+      setIsUnlocked(true);
+      sessionStorage.setItem('dashboard_unlocked', 'true');
+      setPasswordError(false);
+      setEnteredPassword('');
+      showToast('Dashboard låst opp!');
+    } else {
+      setPasswordError(true);
+      setTimeout(() => setPasswordError(false), 2500);
+    }
+  };
+
+  const handleLock = () => {
+    setIsUnlocked(false);
+    sessionStorage.removeItem('dashboard_unlocked');
+    showToast('Dashboard låst.');
   };
 
   const simulateNfcTap = () => {
@@ -307,6 +350,90 @@ export default function App() {
 
   const totalClicks = redirects.reduce((sum, item) => sum + (item.clicks || 0), 0);
   const mostPopular = [...redirects].sort((a, b) => b.clicks - a.clicks)[0];
+
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-sky-600 text-white px-5 py-3 rounded-lg shadow-xl font-medium text-sm flex items-center gap-2 animate-bounce">
+            <Check className="w-4 h-4" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* Bakgrunnsdekor */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative w-full max-w-md bg-slate-900/95 border border-slate-800 rounded-2xl p-7 shadow-2xl backdrop-blur-xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center mx-auto shadow-lg shadow-sky-500/10">
+              <Lock className="w-6 h-6" />
+            </div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Privat Administrasjon</h1>
+            <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              NFC & QR Redirect Engine er låst. Vennligst oppgi ditt admin-passord for å åpne kontrollpanelet.
+            </p>
+          </div>
+
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-300">Admin-passord</label>
+                {adminPassword === 'admin' && (
+                  <span className="text-[11px] text-sky-400 font-mono">Standard: admin</span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={enteredPassword}
+                  onChange={(e) => {
+                    setEnteredPassword(e.target.value);
+                    setPasswordError(false);
+                  }}
+                  autoFocus
+                  placeholder="Skriv inn passord..."
+                  required
+                  className={`w-full bg-slate-950 border ${
+                    passwordError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-700/80'
+                  } rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-11 transition`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                  title={showPassword ? 'Skjul passord' : 'Vis passord'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {passwordError && (
+                <p className="text-xs text-red-400 mt-2 flex items-center gap-1.5 animate-shake">
+                  <span>Feil passord. Prøv igjen.</span>
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2"
+            >
+              <KeyRound className="w-4 h-4" />
+              Lås opp Dashboard
+            </button>
+          </form>
+
+          <div className="pt-2 border-t border-slate-800 text-center">
+            <p className="text-[11px] text-slate-500">
+              Kundeomdirigeringer (<code className="text-slate-400 font-mono">r.html?id=...</code>) forblir offentlige uten passord for sømløse NFC-taps.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
@@ -370,6 +497,15 @@ export default function App() {
               title="Innstillinger"
             >
               <Settings className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={handleLock}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-red-950/40 border border-slate-700/60 text-slate-300 hover:text-red-300 hover:border-red-800/50 transition flex items-center gap-1.5 text-xs font-medium"
+              title="Lås dashboard / Logg ut"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Lås</span>
             </button>
           </div>
         </div>
@@ -791,6 +927,36 @@ export default function App() {
                     required
                     className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
                   />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Privat Admin-passord
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-mono">Låser dashboardet</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showSettingsPassword ? 'text' : 'password'}
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      placeholder="Ditt hemmelige passord..."
+                      required
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-10 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsPassword(!showSettingsPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                      title={showSettingsPassword ? 'Skjul passord' : 'Vis passord'}
+                    >
+                      {showSettingsPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Passordet som kreves for å åpne dette kontrollpanelet. Standard: <code>admin</code>.
+                  </p>
                 </div>
 
                 <div>

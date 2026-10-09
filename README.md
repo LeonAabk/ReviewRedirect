@@ -1,69 +1,93 @@
-# NFC & QR Redirect Engine (Supabase + GitHub Pages)
+# NFC & QR Redirect Engine ⚡
 
-Dynamisk omdirigeringssystem for NFC-kort og Google Review QR-koder.
+Dynamisk omdirigeringssystem og administrasjonspanel for NFC-kort og Google Review QR-koder, drevet av Supabase og GitHub Pages.
 
 ---
 
-## 🚀 Slik pusher du prosjektet til GitHub
+## 🔒 Privat Tilgangskontroll (Admin-passord)
 
-Hvis du har opprettet et nytt repository på GitHub (f.eks. `nfc-redirect`):
+Ettersom administrasjonspanelet kun er ment for deg som administrator, er kontrollpanelet beskyttet med en privat passordlås:
 
-### 1. Koble til GitHub-repositoriet ditt
-Kjør disse kommandoene i terminalen (bytt ut `DITT-BRUKERNAVN` og `DITT-REPO` med dine opplysninger):
+- **Standardpassord:** `admin`
+- **Slik endrer du passord:**
+  1. Lås opp dashboardet med passordet.
+  2. Klikk på tannhjulet (**Innstillinger**) øverst til høyre.
+  3. Skriv inn ditt nye hemmelige passord i feltet **«Privat Admin-passord»**.
+  4. Klikk **«Lagre Innstillinger»**.
+- **Slik låser du dashboardet:** Klikk på **«Lås»**-knappen i toppmenyen når du forlater siden. Innloggingen huskes i nettleserøkten din (sessionStorage) så du slipper å skrive det inn på hvert klikk.
+
+> ℹ️ **Viktig om omdirigeringen for kunder:**  
+> Kundeomdirigeringen (`r.html?id=kafe-hansen`) krever **aldri** passord! Når en gjest berører et fysisk NFC-kort eller skanner en QR-kode, registreres klikket og kunden videresendes umiddelbart (< 0.2 sekunder) til Google Review-siden.
+
+---
+
+## 🚀 Slik pusher du oppdateringer til GitHub
+
+Når du har gjort endringer eller oppdatert nøkler, kjører du disse kommandoene i terminalen:
 
 ```bash
-git remote add origin https://github.com/DITT-BRUKERNAVN/DITT-REPO.git
-git branch -M main
-git push -u origin main
+git add .
+git commit -m "Oppdatering av prosjekt og innstillinger"
+git push origin main
 ```
 
-> **Tips hvis GitHub klager over at repositoriet allerede inneholder en README/fil:**
-> ```bash
-> git pull origin main --rebase
-> git push -u origin main
-> # Eller for å overskrive:
-> git push -u origin main --force
-> ```
+*(Hvis du ikke har koblet opp repositoryet ennå, kjør `git remote add origin https://github.com/DITT-BRUKERNAVN/DITT-REPO.git` og `git branch -M main` før første push).*
 
 ---
 
-## 🌐 Aktivere GitHub Pages
+## 🌐 GitHub Pages Oppsett
 
-Prosjektet er nå klargjort for GitHub Pages på to måter:
+Prosjektet er optimalisert for GitHub Pages og håndterer automatisk undermapper (som `https://brukernavn.github.io/repo-navn/`).
 
-### Alternativ A: Automatisk med GitHub Actions (Anbefalt)
+### Metode 1: GitHub Actions (Anbefalt)
 1. Gå til repositoriet ditt på GitHub.
-2. Klikk på **Settings** (Innstillinger) → **Pages** i venstremenyen.
+2. Velg **Settings** → **Pages**.
 3. Under **Build and deployment → Source**, velg **GitHub Actions**.
-4. Workflow-filen `.github/workflows/deploy.yml` vil automatisk bygge og publisere nettsiden hver gang du pusher til `main`.
+4. GitHub vil nå automatisk bygge og publisere siden via `.github/workflows/deploy.yml` hver gang du pusher til `main`.
 
-### Alternativ B: Rask publisering via `/docs`-mappen
-1. Gå til **Settings** → **Pages**.
-2. Under **Build and deployment → Source**, velg **Deploy from a branch**.
-3. Velg **Branch: main** og mappen **/docs**, og trykk **Save**.
-
----
-
-## 🔗 Dine adresser på GitHub Pages
-
-Når siden er publisert på GitHub Pages (f.eks. `https://dittbrukernavn.github.io/ditt-repo/`):
-
-- **Omdirigeringsmotor:**  
-  `https://dittbrukernavn.github.io/ditt-repo/r.html?id=kafe-hansen`
-- **Admin Dashboard:**  
-  `https://dittbrukernavn.github.io/ditt-repo/admin.html`
-- **Hovedportal:**  
-  `https://dittbrukernavn.github.io/ditt-repo/`
-
-> Merk: Systemet oppdager automatisk undermappen på GitHub Pages (`/ditt-repo/`), slik at "Kopier lenke"-knappen og QR-kodene alltid genererer riktig full adresse.
+### Metode 2: Deploy fra /docs-mappen
+1. Bygg docs lokalt hvis du har gjort endringer:
+   ```bash
+   npm run build:docs
+   git add docs && git commit -m "build: update docs" && git push origin main
+   ```
+2. Gå til **Settings** → **Pages** på GitHub.
+3. Velg **Deploy from a branch** → Branch **main** og mappe **/docs** → **Save**.
 
 ---
 
-## 🗄️ Supabase Oppsett
+## 🔗 Dine adresser
 
-Husk å kjøre dette i Supabase **SQL Editor**:
+Når siden kjører på ditt domene eller GitHub Pages:
+
+| Formål | Adresse | Tilgang |
+| :--- | :--- | :--- |
+| **Admin Dashboard (Hovedportal)** | `https://dittdomene.no/` | 🔒 Krever passord |
+| **Admin Dashboard (Alternativ fil)** | `https://dittdomene.no/admin.html` | 🔒 Krever passord |
+| **Kunde-omdirigering (NFC / QR)** | `https://dittdomene.no/r.html?id=[slug]` | 🌍 Offentlig & lynrask |
+
+---
+
+## 📱 Slik programmerer du NFC-kort
+
+1. Last ned gratisappen **NFC Tools** på iPhone (App Store) eller Android (Google Play).
+2. Opprett en bedrift i dashboardet (f.eks. slug: `kafe-hansen`).
+3. Trykk på **«Kopier lenke»** i dashboardet for å kopiere `https://dittdomene.no/r.html?id=kafe-hansen`.
+4. I NFC Tools-appen:
+   - Velg **Write** (Skriv).
+   - Velg **Add a record** → **URL / URI**.
+   - Lim inn den kopierte adressen.
+   - Velg **Write / 18 Bytes** og hold mobiltelefonen inntil NFC-kortet eller klistremerket til du får bekreftelse.
+5. Kortet er nå klart til bruk! Hver gang en kunde taper på kortet, telles klikket automatisk i Supabase og kunden sendes rett til anmeldelsessiden.
+
+---
+
+## 🗄️ Supabase Oppsett (Database & RLS)
+
+Hvis du skal sette opp et nytt prosjekt i Supabase, lim inn følgende i **SQL Editor**:
 
 ```sql
+-- 1. Opprett tabell for omdirigeringer
 create table if not exists public.redirects (
   id text primary key,
   google_url text not null,
@@ -71,8 +95,10 @@ create table if not exists public.redirects (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- 2. Aktiver Row Level Security (RLS)
 alter table public.redirects enable row level security;
 
+-- 3. Åpne tilganger for lesing, oppretting, oppdatering og sletting
 create policy "Allow public read" on public.redirects for select using (true);
 create policy "Allow public insert" on public.redirects for insert with check (true);
 create policy "Allow public update" on public.redirects for update using (true);
