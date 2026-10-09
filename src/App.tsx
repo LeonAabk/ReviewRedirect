@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
+import { createClient } from '@supabase/supabase-js';
 import {
   Link2,
   QrCode as QrIcon,
@@ -99,6 +100,47 @@ export default function App() {
   const [isConnectedToSupabase, setIsConnectedToSupabase] = useState(true);
   const [selectedFileView, setSelectedFileView] = useState<'r.html' | 'admin.html'>('r.html');
 
+  // Hent aktiv Supabase klient
+  const getSupabaseClient = () => {
+    if (!config.url || !config.key || config.url.includes('DITT-PROSJEKT')) return null;
+    try {
+      return createClient(config.url, config.key);
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
+  // Last live redirects fra Supabase
+  const loadLiveRedirects = async () => {
+    const client = getSupabaseClient();
+    if (!client) return;
+    try {
+      const { data, error } = await client.from('redirects').select('*');
+      if (error) {
+        console.error('Supabase query error:', error);
+        return;
+      }
+      if (data) {
+        const sorted = data.sort((a, b) => {
+          if (a.created_at && b.created_at) {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }
+          return (a.id || '').localeCompare(b.id || '');
+        });
+        setRedirects(sorted);
+        if (sorted.length > 0) {
+          setSelectedForCard(prev => {
+            if (!prev) return sorted[0];
+            return sorted.find(s => s.id === prev.id) || sorted[0];
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load from Supabase:', e);
+    }
+  };
+
   // Last initielle data
   useEffect(() => {
     // Last config
@@ -117,41 +159,7 @@ export default function App() {
       console.error(e);
     }
 
-    // Last redirects
-    try {
-      const storedRedirects = localStorage.getItem('mock_redirects');
-      if (storedRedirects) {
-        const parsed = JSON.parse(storedRedirects);
-        setRedirects(parsed);
-        if (parsed.length > 0) setSelectedForCard(parsed[0]);
-      } else {
-        const initial = [
-          {
-            id: 'kafe-hansen',
-            google_url: 'https://g.page/r/kafe-hansen/review',
-            clicks: 48,
-            created_at: new Date(Date.now() - 86400000 * 4).toISOString()
-          },
-          {
-            id: 'oslo-barbershop',
-            google_url: 'https://maps.app.goo.gl/oslo-barbershop',
-            clicks: 132,
-            created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-          },
-          {
-            id: 'bakeri-nord',
-            google_url: 'https://g.page/r/bakeri-nord/review',
-            clicks: 19,
-            created_at: new Date(Date.now() - 86400000 * 1).toISOString()
-          }
-        ];
-        setRedirects(initial);
-        localStorage.setItem('mock_redirects', JSON.stringify(initial));
-        setSelectedForCard(initial[0]);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    loadLiveRedirects();
   }, []);
 
   // Generer QR-kode når selectedForCard endrer seg
@@ -194,7 +202,7 @@ export default function App() {
     return `https://dittdomene.no/r.html?id=${encodeURIComponent(id)}`;
   };
 
-  const handleSaveRedirect = (e: React.FormEvent) => {
+  const handleSaveRedirect = async (e: React.FormEvent) => {
     e.preventDefault();
     let slug = slugInput.trim().toLowerCase()
       .replace(/\s+/g, '-')
@@ -210,6 +218,31 @@ export default function App() {
       return;
     }
 
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { error } = await client
+          .from('redirects')
+          .upsert({ id: slug, google_url: url }, { onConflict: 'id' });
+
+        if (error) {
+          showToast(`Feil fra Supabase: ${error.message}`);
+          return;
+        }
+
+        showToast(`Lagret "${slug}" direkte i Supabase!`);
+        await loadLiveRedirects();
+        setSelectedForCard({ id: slug, google_url: url, clicks: 0 });
+        setSlugInput('');
+        setUrlInput('');
+        return;
+      } catch (err: any) {
+        showToast(`Feil: ${err.message || 'Kunne ikke lagre'}`);
+        return;
+      }
+    }
+
+    // Fallback hvis Supabase ikke er tilkoblet
     const existingIdx = redirects.findIndex(r => r.id === slug);
     let updated: RedirectItem[];
 
@@ -233,21 +266,29 @@ export default function App() {
     }
 
     setRedirects(updated);
-    try {
-      localStorage.setItem('mock_redirects', JSON.stringify(updated));
-    } catch (e) {}
-
     setSlugInput('');
     setUrlInput('');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm(`Er du sikker på at du vil slette omdirigeringen for "${id}"?`)) {
+      const client = getSupabaseClient();
+      if (client) {
+        try {
+          const { error } = await client.from('redirects').delete().eq('id', id);
+          if (error) {
+            showToast(`Kunne ikke slette: ${error.message}`);
+            return;
+          }
+          showToast(`Slettet "${id}" fra Supabase!`);
+          await loadLiveRedirects();
+          return;
+        } catch (err: any) {
+          console.error(err);
+        }
+      }
       const updated = redirects.filter(r => r.id !== id);
       setRedirects(updated);
-      try {
-        localStorage.setItem('mock_redirects', JSON.stringify(updated));
-      } catch (e) {}
       if (selectedForCard?.id === id) {
         setSelectedForCard(updated[0] || null);
       }
