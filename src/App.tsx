@@ -455,14 +455,14 @@ export default function App() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative w-full max-w-md bg-slate-900/95 border border-slate-800 rounded-2xl p-7 shadow-2xl backdrop-blur-xl space-y-6">
+        <div className="relative w-full max-w-sm sm:max-w-md bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl space-y-5 sm:space-y-6">
           <div className="text-center space-y-2">
             <div className="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center mx-auto shadow-lg shadow-sky-500/10">
               <Lock className="w-6 h-6" />
             </div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Privat Administrasjon</h1>
-            <p className="text-xs text-slate-400 max-w-xs mx-auto">
-              NFC & QR Redirect Engine er låst. Vennligst oppgi ditt admin-passord for å åpne kontrollpanelet.
+            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">Privat Administrasjon</h1>
+            <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+              NFC & QR Redirect Engine er låst. Oppgi ditt admin-passord for å åpne kontrollpanelet.
             </p>
           </div>
 
@@ -484,12 +484,12 @@ export default function App() {
                   required
                   className={`w-full bg-slate-950 border ${
                     passwordError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-700/80'
-                  } rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-11 transition`}
+                  } rounded-xl px-4 py-3 text-base sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-11 transition min-h-[46px]`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition p-1"
                   title={showPassword ? 'Skjul passord' : 'Vis passord'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -504,7 +504,7 @@ export default function App() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 active:from-sky-700 active:to-sky-600 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
             >
               <KeyRound className="w-4 h-4" />
               Lås opp Dashboard
@@ -532,20 +532,22 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
+      <header className="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-4 flex items-center justify-between gap-2 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-base sm:text-lg border border-sky-500/30">
               ⚡
             </div>
-            <div>
-              <h1 className="font-bold text-slate-100 text-base sm:text-lg leading-tight tracking-tight">
-                NFC & QR Redirect Engine
+            <div className="min-w-0">
+              <h1 className="font-bold text-slate-100 text-sm sm:text-lg leading-tight tracking-tight truncate">
+                <span className="sm:hidden">NFC & QR</span>
+                <span className="hidden sm:inline">NFC & QR Redirect Engine</span>
               </h1>
-              <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <span>Supabase Live Routing</span>
-                <span>·</span>
-                <span className="text-emerald-400 font-medium">
+              <div className="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
+                <span className="hidden xs:inline">Supabase Live</span>
+                <span className="hidden xs:inline">·</span>
+                <span className="text-emerald-400 font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
                   Tilkoblet
                 </span>
               </div>
@@ -553,13 +555,13 @@ export default function App() {
           </div>
 
           {/* Navigasjon */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <nav className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <nav className="flex items-center gap-1 p-0.5 sm:p-1 bg-slate-950/70 rounded-xl border border-slate-800/80">
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[36px] flex items-center ${
                   activeTab === 'dashboard'
-                    ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-semibold'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
               >
@@ -567,73 +569,76 @@ export default function App() {
               </button>
               <button
                 onClick={() => setActiveTab('nfc')}
-                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap min-h-[36px] flex items-center ${
                   activeTab === 'nfc'
-                    ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-semibold'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
               >
-                NFC & QR Generator
+                <span className="sm:hidden">Kort</span>
+                <span className="hidden sm:inline">NFC & QR Generator</span>
               </button>
             </nav>
 
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-slate-300 hover:text-white transition"
+              className="p-2 sm:p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 active:bg-slate-700 border border-slate-700/60 text-slate-300 hover:text-white transition min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
               title="Innstillinger"
+              aria-label="Innstillinger"
             >
               <Settings className="w-4 h-4" />
             </button>
 
             <button
               onClick={handleLock}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-red-950/40 border border-slate-700/60 text-slate-300 hover:text-red-300 hover:border-red-800/50 transition flex items-center gap-1.5 text-xs font-medium"
+              className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-800/70 hover:bg-red-950/40 active:bg-red-950/70 border border-slate-700/60 text-slate-300 hover:text-red-300 hover:border-red-800/50 transition flex items-center gap-1.5 text-xs font-medium min-h-[36px] cursor-pointer"
               title="Lås dashboard / Logg ut"
+              aria-label="Lås dashboard"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Lås</span>
+              <span className="hidden md:inline">Lås</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Hovedinnhold */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+      <main className="max-w-7xl mx-auto px-3.5 sm:px-6 pt-5 sm:pt-8">
 
         {/* TAB 1: DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* Statistikk-oversikt */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Aktive Omdirigeringer</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase tracking-wider font-semibold">Aktive Omdirigeringer</div>
                 <div className="text-2xl sm:text-3xl font-bold font-mono text-white mt-1 tabular-nums">
                   {redirects.length}
                 </div>
-                <div className="text-xs text-slate-500 mt-2">Knyttet til NFC & QR-koder</div>
+                <div className="text-xs text-slate-500 mt-1 sm:mt-2">Knyttet til NFC & QR-koder</div>
               </div>
 
-              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Totale Omdirigeringer / Klikk</div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase tracking-wider font-semibold">Totale Omdirigeringer / Klikk</div>
                 <div className="text-2xl sm:text-3xl font-bold font-mono text-sky-400 mt-1 tabular-nums">
                   {totalClicks}
                 </div>
-                <div className="text-xs text-slate-500 mt-2">Registrert automatisk i Supabase</div>
+                <div className="text-xs text-slate-500 mt-1 sm:mt-2">Registrert automatisk i Supabase</div>
               </div>
 
-              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5">
-                <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Mest Populære Bedrift</div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 sm:p-5">
+                <div className="text-[11px] sm:text-xs text-slate-400 uppercase tracking-wider font-semibold">Mest Populære Bedrift</div>
                 <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-1 truncate">
                   {mostPopular ? `${mostPopular.id} (${mostPopular.clicks})` : '-'}
                 </div>
-                <div className="text-xs text-slate-500 mt-2">Flest Google Review-taps</div>
+                <div className="text-xs text-slate-500 mt-1 sm:mt-2">Flest Google Review-taps</div>
               </div>
             </div>
 
             {/* Skjema for å legge til nye bedrifter */}
-            <section className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
-              <div className="mb-5">
-                <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <section className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+              <div className="mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
                   <Plus className="w-5 h-5 text-sky-400" />
                   Legg til ny bedrift / omdirigering
                 </h2>
@@ -642,7 +647,7 @@ export default function App() {
                 </p>
               </div>
 
-              <form onSubmit={handleSaveRedirect} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+              <form onSubmit={handleSaveRedirect} className="grid grid-cols-1 md:grid-cols-12 gap-3.5 sm:gap-4 items-end">
                 <div className="md:col-span-4">
                   <label htmlFor="form-slug" className="block text-xs font-semibold text-slate-300 mb-1.5">
                     Kunde-ID / Slug (f.eks. kafe-hansen)
@@ -654,7 +659,7 @@ export default function App() {
                     onChange={(e) => setSlugInput(e.target.value)}
                     placeholder="kafe-hansen"
                     required
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition min-h-[44px]"
                   />
                 </div>
 
@@ -669,14 +674,14 @@ export default function App() {
                     onChange={(e) => setUrlInput(e.target.value)}
                     placeholder="https://g.page/r/kafe-hansen/review"
                     required
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition min-h-[44px]"
                   />
                 </div>
 
                 <div className="md:col-span-2">
                   <button
                     type="submit"
-                    className="w-full h-[42px] bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20"
+                    className="w-full h-[44px] min-h-[44px] bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-sm font-semibold rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     Lagre
@@ -685,11 +690,11 @@ export default function App() {
               </form>
             </section>
 
-            {/* Tabell over omdirigeringer */}
-            <section className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Tabell & Kort-oversikt over omdirigeringer */}
+            <section className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white tracking-tight">
+                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
                     Registrerte omdirigeringer i Supabase
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
@@ -697,22 +702,112 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="relative">
+                <div className="w-full sm:w-auto">
+                  <div className="relative w-full">
                     <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Søk i ID eller lenke..."
-                      className="bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-3.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 w-56 transition"
+                      className="bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-3.5 py-2 text-base sm:text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 w-full sm:w-56 transition min-h-[40px] sm:min-h-0"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Tabell */}
-              <div className="overflow-x-auto border border-slate-800/80 rounded-xl">
+              {/* MOBILVISNING (Kort): Vises kun på mobil (< md) */}
+              <div className="space-y-3 block md:hidden">
+                {filteredRedirects.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800/60 p-4">
+                    Ingen omdirigeringer funnet. Legg til en over!
+                  </div>
+                ) : (
+                  filteredRedirects.map((item) => (
+                    <div
+                      key={item.id}
+                      className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-3"
+                    >
+                      {/* Topp: ID og Klikk-teller */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-sky-400 text-sm tracking-tight truncate">
+                          {item.id}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 font-mono text-xs font-bold text-emerald-400 tabular-nums shrink-0">
+                          <span className="text-[10px] text-slate-400 font-sans font-normal">klikk:</span>
+                          {item.clicks || 0}
+                        </span>
+                      </div>
+
+                      {/* Destinasjonslenke */}
+                      <div>
+                        <a
+                          href={item.google_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:text-white hover:underline flex items-center gap-1.5 text-xs text-slate-300 break-all bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                          <span className="truncate">{item.google_url}</span>
+                        </a>
+                      </div>
+
+                      {/* Handlingsknapper på mobil (tommelvennlig 2x2 rutenett) */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/60">
+                        <button
+                          onClick={() => handleCopyLink(item.id)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition min-h-[40px] cursor-pointer"
+                        >
+                          {isCopiedId === item.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400">Kopiert!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Kopier lenke</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedForCard(item);
+                            setActiveTab('nfc');
+                          }}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-slate-700 text-xs font-medium text-purple-300 border border-slate-700 transition min-h-[40px] cursor-pointer"
+                        >
+                          <QrIcon className="w-3.5 h-3.5" />
+                          <span>QR & Kort</span>
+                        </button>
+
+                        <a
+                          href={buildFullUrl(item.id)}
+                          onClick={(e) => handleTestRedirect(e, item)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-950/60 active:bg-sky-900 text-xs font-semibold text-sky-300 border border-sky-800/60 transition min-h-[40px] cursor-pointer"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Test</span>
+                        </a>
+
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-red-950/60 text-xs font-medium text-red-400 border border-slate-700 active:border-red-800 transition min-h-[40px] cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Slett</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* DESKTOP/NETTBRETT TABELL: Vises på md og oppover */}
+              <div className="hidden md:block overflow-x-auto border border-slate-800/80 rounded-xl">
                 <table className="w-full text-left text-sm border-collapse">
                   <thead>
                     <tr className="bg-slate-950/70 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -752,7 +847,7 @@ export default function App() {
                           <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                             <button
                               onClick={() => handleCopyLink(item.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition cursor-pointer"
                               title="Kopier omdirigeringsadresse"
                             >
                               {isCopiedId === item.id ? (
@@ -773,7 +868,7 @@ export default function App() {
                                 setSelectedForCard(item);
                                 setActiveTab('nfc');
                               }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-purple-300 border border-slate-700 transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-purple-300 border border-slate-700 transition cursor-pointer"
                               title="Generer NFC & QR-kort"
                             >
                               <QrIcon className="w-3.5 h-3.5" />
@@ -794,7 +889,7 @@ export default function App() {
 
                             <button
                               onClick={() => handleDelete(item.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-red-950/40 text-xs font-medium text-red-400 border border-slate-700 hover:border-red-800 transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-red-950/40 text-xs font-medium text-red-400 border border-slate-700 hover:border-red-800 transition cursor-pointer"
                               title="Slett oppføring"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -813,21 +908,21 @@ export default function App() {
 
         {/* TAB 2: NFC & QR CARD GENERATOR */}
         {activeTab === 'nfc' && (
-          <div className="space-y-8">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="space-y-6 sm:space-y-8">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-6">
                 <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                     <Smartphone className="w-5 h-5 text-sky-400" />
                     NFC-Kort & Borddisplay Generator
                   </h2>
-                  <p className="text-sm text-slate-400 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
                     Forhåndsvis det fysiske NFC-kortet eller borddisplayet for en valgt bedrift, test virtuell NFC-berøring, eller last ned QR-koden for trykk.
                   </p>
                 </div>
 
                 {/* Velg bedrift */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
                   <label className="text-xs font-semibold text-slate-400">Velg bedrift:</label>
                   <select
                     value={selectedForCard?.id || ''}
@@ -835,7 +930,7 @@ export default function App() {
                       const found = redirects.find(r => r.id === e.target.value);
                       if (found) setSelectedForCard(found);
                     }}
-                    className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-sky-500"
+                    className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-base sm:text-sm text-white font-mono focus:outline-none focus:border-sky-500 w-full sm:w-auto min-h-[40px]"
                   >
                     {redirects.map(r => (
                       <option key={r.id} value={r.id}>{r.id} ({r.clicks} klikk)</option>
@@ -845,10 +940,10 @@ export default function App() {
               </div>
 
               {selectedForCard ? (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
                   {/* Fysisk Kort-Mockup */}
                   <div className="lg:col-span-7 flex justify-center">
-                    <div className="relative w-full max-w-md aspect-[1.586/1] rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950 border border-slate-700/80 p-6 shadow-2xl flex flex-col justify-between overflow-hidden">
+                    <div className="relative w-full max-w-md aspect-[1.586/1] rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950 border border-slate-700/80 p-4 sm:p-6 shadow-2xl flex flex-col justify-between overflow-hidden">
                       {/* Bakgrunnsdekor */}
                       <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
                       <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -856,46 +951,46 @@ export default function App() {
                       {/* Topp på kort */}
                       <div className="relative z-10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white text-sm border border-white/20">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white text-xs sm:text-sm border border-white/20 shrink-0">
                             ★
                           </div>
-                          <div>
-                            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                          <div className="min-w-0">
+                            <div className="text-[10px] sm:text-xs font-semibold text-slate-300 uppercase tracking-wider truncate">
                               Gi oss en anmeldelse
                             </div>
-                            <div className="text-sm font-bold text-white capitalize">
+                            <div className="text-xs sm:text-sm font-bold text-white capitalize truncate">
                               {selectedForCard.id.replace(/-/g, ' ')}
                             </div>
                           </div>
                         </div>
 
                         {/* NFC Brikke-ikon */}
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-medium">
-                          <Smartphone className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-[10px] sm:text-xs font-medium shrink-0">
+                          <Smartphone className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
                           <span>NFC Tap</span>
                         </div>
                       </div>
 
                       {/* Midtparti med QR-kode */}
-                      <div className="relative z-10 flex items-center justify-between my-2">
-                        <div className="space-y-2 max-w-[200px]">
-                          <div className="text-xs text-slate-300 leading-relaxed">
-                            Hold telefonen inntil kortet eller skann QR-koden for å gi din vurdering på Google.
+                      <div className="relative z-10 flex items-center justify-between my-1 sm:my-2 gap-2">
+                        <div className="space-y-1 sm:space-y-2 max-w-[170px] sm:max-w-[200px]">
+                          <div className="text-[11px] sm:text-xs text-slate-300 leading-snug sm:leading-relaxed">
+                            Hold telefonen inntil kortet eller skann QR-koden for å gi anmeldelse.
                           </div>
-                          <div className="text-[11px] font-mono text-sky-400 break-all bg-black/40 px-2 py-1 rounded border border-white/5">
+                          <div className="text-[10px] sm:text-[11px] font-mono text-sky-400 break-all bg-black/40 px-2 py-0.5 sm:py-1 rounded border border-white/5 truncate">
                             ?id={selectedForCard.id}
                           </div>
                         </div>
 
                         {cardQrDataUrl && (
-                          <div className="bg-white p-2 rounded-xl shadow-lg border border-slate-200">
-                            <img src={cardQrDataUrl} alt="QR Kode" className="w-24 h-24 sm:w-28 sm:h-28" />
+                          <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-lg border border-slate-200 shrink-0">
+                            <img src={cardQrDataUrl} alt="QR Kode" className="w-18 h-18 sm:w-28 sm:h-28" />
                           </div>
                         )}
                       </div>
 
                       {/* Bunn på kort */}
-                      <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-white/10">
+                      <div className="relative z-10 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 pt-1.5 sm:pt-2 border-t border-white/10">
                         <span>Google Reviews Direct</span>
                         <span className="font-mono tabular-nums">{selectedForCard.clicks} anmeldelses-taps</span>
                       </div>
@@ -903,16 +998,16 @@ export default function App() {
                   </div>
 
                   {/* Handlinger for kort */}
-                  <div className="lg:col-span-5 space-y-5">
-                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                      <div className="text-xs uppercase font-semibold tracking-wider text-slate-400">
+                  <div className="lg:col-span-5 space-y-4 sm:space-y-5">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 sm:space-y-3">
+                      <div className="text-[11px] sm:text-xs uppercase font-semibold tracking-wider text-slate-400">
                         Aktiv Omdirigerings-URL
                       </div>
                       <div className="font-mono text-xs text-sky-400 bg-slate-900 p-2.5 rounded-lg border border-slate-800 break-all">
                         {buildFullUrl(selectedForCard.id)}
                       </div>
-                      <div className="text-xs text-slate-400">
-                        Mål: <span className="text-slate-200 break-all">{selectedForCard.google_url}</span>
+                      <div className="text-xs text-slate-400 break-all">
+                        Mål: <span className="text-slate-200">{selectedForCard.google_url}</span>
                       </div>
                     </div>
 
@@ -921,29 +1016,29 @@ export default function App() {
                       <button
                         onClick={simulateNfcTap}
                         disabled={isSimulatingNfc}
-                        className="w-full py-3.5 px-4 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 disabled:opacity-50"
+                        className="w-full py-3.5 px-4 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 active:from-sky-700 active:to-sky-600 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 disabled:opacity-50 min-h-[46px] cursor-pointer"
                       >
                         <Smartphone className="w-5 h-5 animate-pulse" />
                         {isSimulatingNfc ? 'Registrerer NFC Tap...' : 'Simuler Telefon Tap på NFC-Kort'}
                       </button>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                         {cardQrDataUrl && (
                           <a
                             href={cardQrDataUrl}
                             download={`qr-${selectedForCard.id}.png`}
-                            className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5"
+                            className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 min-h-[42px]"
                           >
                             <Download className="w-3.5 h-3.5" />
-                            Last ned QR (PNG)
+                            <span>Last ned QR</span>
                           </a>
                         )}
                         <button
                           onClick={() => handleCopyLink(selectedForCard.id)}
-                          className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5"
+                          className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 min-h-[42px] cursor-pointer"
                         >
                           <Copy className="w-3.5 h-3.5" />
-                          Kopier NFC-URL
+                          <span>Kopier URL</span>
                         </button>
                       </div>
                     </div>
@@ -960,11 +1055,11 @@ export default function App() {
 
         {/* INNSTILLINGER-MODAL */}
         {isSettingsOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full max-h-[88vh] overflow-y-auto p-5 sm:p-6 shadow-2xl relative space-y-4 sm:space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center border border-sky-500/20">
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
                     <Sliders className="w-4 h-4" />
                   </div>
                   <div>
@@ -974,7 +1069,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setIsSettingsOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -998,7 +1093,7 @@ export default function App() {
                     onChange={(e) => setConfig({ ...config, url: e.target.value.trim() })}
                     placeholder="https://xyzcompany.supabase.co"
                     required
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition min-h-[42px]"
                   />
                 </div>
 
@@ -1012,7 +1107,7 @@ export default function App() {
                     onChange={(e) => setConfig({ ...config, key: e.target.value.trim() })}
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
                     required
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition min-h-[42px]"
                   />
                 </div>
 
@@ -1030,12 +1125,12 @@ export default function App() {
                       onChange={(e) => setAdminPassword(e.target.value)}
                       placeholder="Ditt hemmelige passord..."
                       required
-                      className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-10 transition"
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-10 transition min-h-[42px]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSettingsPassword(!showSettingsPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition p-1"
                       title={showSettingsPassword ? 'Skjul passord' : 'Vis passord'}
                     >
                       {showSettingsPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1055,7 +1150,7 @@ export default function App() {
                     value={config.customDomain}
                     onChange={(e) => setConfig({ ...config, customDomain: e.target.value.trim() })}
                     placeholder="f.eks. mittdomene.no (la stå tom for å bruke aktiv nettside)"
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition min-h-[42px]"
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
                     Brukt ved kopiering av lenke, f.eks: <code>dittdomene.no/r.html?id=kafe-hansen</code>.
@@ -1066,13 +1161,13 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setIsSettingsOpen(false)}
-                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                    className="px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition min-h-[40px] cursor-pointer"
                   >
                     Avbryt
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition shadow-lg shadow-sky-600/20"
+                    className="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition shadow-lg shadow-sky-600/20 min-h-[40px] cursor-pointer"
                   >
                     Lagre Innstillinger
                   </button>

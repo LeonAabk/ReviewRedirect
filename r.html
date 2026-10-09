@@ -130,6 +130,109 @@
       color: #64748b;
       line-height: 1.4;
     }
+
+    /* Suksesskort når omdirigeringen er sendt */
+    .success-card {
+      display: none;
+      max-width: 440px;
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 2.25rem 2rem;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .success-icon {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 1.25rem;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #4ade80;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .success-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 0.5rem;
+    }
+
+    .success-desc {
+      font-size: 0.95rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      background: #22c55e;
+      color: #0f172a;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.8rem 1.25rem;
+      border-radius: 10px;
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+    }
+
+    .btn-close:hover {
+      background: #4ade80;
+      transform: translateY(-1px);
+    }
+
+    .btn-close:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      margin-top: 0.75rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.875rem;
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f8fafc;
+    }
+
+    .auto-close-hint {
+      margin-top: 1.25rem;
+      font-size: 0.8rem;
+      color: #64748b;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -138,6 +241,35 @@
   <div id="loader" class="loader-container">
     <div class="spinner"></div>
     <div class="status-text">Kobler til omdirigering...</div>
+  </div>
+
+  <!-- Suksesskort (vises idet brukeren sendes til Google Maps) -->
+  <div id="success-card" class="success-card">
+    <div class="success-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <h1 class="success-title">Omdirigert til Google Maps</h1>
+    <p class="success-desc">
+      Google Maps åpnes på enheten din nå.
+    </p>
+    <button type="button" class="btn-close" onclick="closeCurrentTab()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+      Lukk denne fanen
+    </button>
+    <a id="btn-reopen" href="#" class="btn-secondary">
+      Åpne i Google Maps igjen
+    </a>
+    <div class="auto-close-hint">
+      <span id="close-countdown" style="color: #94a3b8; font-weight: 500;">Lukker fanen automatisk...</span>
+      <p style="margin-top: 0.35rem; font-size: 0.75rem; color: #64748b;">
+        Dersom mobilnettleseren din blokkerer automatisk lukking, trykk «Lukk denne fanen» eller lukk fanen manuelt.
+      </p>
+    </div>
   </div>
 
   <!-- Feilmelding (vises hvis rad ikke finnes eller lenke er ugyldig) -->
@@ -172,6 +304,77 @@
         return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
       }
       return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isDefault: true };
+    }
+
+    // Hjelpefunksjon for å forsøke å lukke omdirigeringsfanen
+    function closeCurrentTab() {
+      try {
+        window.close();
+      } catch (e) {}
+      try {
+        self.close();
+      } catch (e) {}
+      try {
+        window.open('', '_self', '');
+        window.close();
+      } catch (e) {}
+      // Fallback: hvis brukeren har historikk i samme fane, gå tilbake
+      if (window.history.length > 1) {
+        try {
+          window.history.back();
+        } catch (e) {}
+      }
+    }
+
+    // Utfører omdirigeringen, oppdaterer UI og forsøker å lukke fanen
+    function performRedirectAndClose(url) {
+      let targetUrl = (url || '').trim();
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = 'https://' + targetUrl;
+      }
+
+      // 1. Skjul spinner og vis suksess-kort (i tilfelle fanen blir stående i nettleseren)
+      const loader = document.getElementById('loader');
+      if (loader) loader.style.display = 'none';
+
+      const successCard = document.getElementById('success-card');
+      const reopenBtn = document.getElementById('btn-reopen');
+      if (reopenBtn) reopenBtn.href = targetUrl;
+      if (successCard) successCard.style.display = 'block';
+
+      // 2. Lytt etter når mobilen overleverer fokus til Google Maps-appen
+      window.addEventListener('pagehide', closeCurrentTab);
+      window.addEventListener('blur', closeCurrentTab);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          closeCurrentTab();
+        }
+      });
+
+      // 3. Utfør selve omdirigeringen
+      // Vi bruker window.location.href slik at operativsystemet/nettleseren fanger opp app-lenken
+      window.location.href = targetUrl;
+
+      // 4. Forsøk å lukke fanen automatisk etter at omdirigeringen er sendt
+      setTimeout(closeCurrentTab, 350);
+      setTimeout(closeCurrentTab, 1000);
+      setTimeout(closeCurrentTab, 2500);
+
+      // 5. Visuell nedtelling i kortet dersom nettleserens sikkerhetspolicy blokkerer automatisk lukking
+      let timeLeft = 3;
+      const countdownEl = document.getElementById('close-countdown');
+      const countdownInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          clearInterval(countdownInterval);
+          if (countdownEl) {
+            countdownEl.textContent = 'Du kan nå trygt lukke denne fanen.';
+          }
+          closeCurrentTab();
+        } else if (countdownEl) {
+          countdownEl.textContent = `Lukker fanen automatisk (${timeLeft}s)...`;
+        }
+      }, 1000);
     }
 
     // Vis feilskjerm
@@ -215,7 +418,7 @@
             if (found && found.google_url) {
               found.clicks = (found.clicks || 0) + 1;
               localStorage.setItem('mock_redirects', JSON.stringify(list));
-              window.location.replace(found.google_url);
+              performRedirectAndClose(found.google_url);
               return;
             }
           }
@@ -291,12 +494,8 @@
           }
         } catch (cacheErr) {}
 
-        // 5. Umiddelbar omdirigering til google_url
-        let targetUrl = data.google_url.trim();
-        if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-          targetUrl = 'https://' + targetUrl;
-        }
-        window.location.replace(targetUrl);
+        // 5. Umiddelbar omdirigering til google_url og automatisk lukking
+        performRedirectAndClose(data.google_url);
 
       } catch (err) {
         console.error('Uventet feil:', err);
