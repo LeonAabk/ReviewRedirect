@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard · NFC & QR Omdirigering</title>
+  <!-- Offisiell Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- QRCode bibliotek for QR-forhåndsvisning -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-light: rgba(2, 132, 199, 0.12);
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding-bottom: 4rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: #0f172a;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: #cbd5e1;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Hovedcontainer */
+    main {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Varselstripe for Supabase Status */
+    .status-banner {
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .status-banner.warning {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+    }
+
+    /* Oppsummeringsfelter */
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Skjema-seksjon */
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    }
+
+    .section-header {
+      margin-bottom: 1.25rem;
+    }
+
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+
+    .section-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr auto;
+      gap: 1rem;
+      align-items: flex-end;
+    }
+
+    @media (max-width: 860px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .input-label {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    .input-field {
+      width: 100%;
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.9rem;
+      color: #ffffff;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .input-field.mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.78rem 1.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Tabell-seksjon */
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 0.55rem 0.85rem;
+      font-size: 0.85rem;
+      color: #ffffff;
+      width: 260px;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #38bdf8;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    thead {
+      background: #0b1120;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    th {
+      padding: 0.85rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    th.num, td.num {
+      text-align: right;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background 0.1s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    td {
+      padding: 0.9rem 1rem;
+      color: #e2e8f0;
+      vertical-align: middle;
+    }
+
+    .slug-cell {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: #38bdf8;
+      font-size: 0.85rem;
+    }
+
+    .url-cell {
+      max-width: 380px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .url-link {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.1s ease;
+    }
+
+    .url-link:hover {
+      color: #ffffff;
+      text-decoration: underline;
+    }
+
+    .click-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: #ffffff;
+      font-size: 0.95rem;
+    }
+
+    .actions-cell {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: #cbd5e1;
+      border-radius: 6px;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.785rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .btn-action.copy:hover {
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+
+    .btn-action.qr:hover {
+      border-color: #a855f7;
+      color: #c084fc;
+    }
+
+    .btn-action.delete {
+      color: #f87171;
+    }
+
+    .btn-action.delete:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--danger);
+      color: #ffffff;
+    }
+
+    /* Tom tilstand */
+    .empty-state {
+      padding: 3.5rem 1rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 0.35rem;
+    }
+
+    /* Modal / Popup */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-card {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      max-width: 580px;
+      width: 100%;
+      padding: 1.75rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+
+    .modal-close:hover {
+      color: #ffffff;
+    }
+
+    .code-snippet {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 1rem 0;
+    }
+
+    /* Toast varsler */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #0284c7;
+      color: #ffffff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      z-index: 120;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      background: #dc2626;
+    }
+
+    .qr-preview-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: #ffffff;
+      border-radius: 12px;
+      margin: 1rem 0;
+    }
+
+    .qr-preview-box canvas {
+      max-width: 200px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topplinje -->
+  <header>
+    <div class="header-inner">
+      <a href="admin.html" class="brand-title">
+        <span class="brand-icon">N</span>
+        NFC & QR Redirect Engine
+      </a>
+      <div class="header-actions">
+        <button id="btn-open-schema" class="btn-secondary" onclick="openSqlModal()">
+          Supabase SQL Setup
+        </button>
+        <button id="btn-open-config" class="btn-secondary" onclick="openConfigModal()">
+          Innstillinger
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Status-banner for Supabase-tilkobling -->
+    <div id="connection-banner" class="status-banner" style="display: none;">
+      <div>
+        <strong id="banner-title">Supabase-tilkobling:</strong>
+        <span id="banner-text">Klar.</span>
+      </div>
+      <button class="btn-secondary" onclick="openConfigModal()">Endre nøkler</button>
+    </div>
+
+    <!-- Nøkkeltall -->
+    <div class="stats-strip">
+      <div class="stat-box">
+        <div class="stat-label">Aktive Omdirigeringer</div>
+        <div class="stat-value" id="stat-total-links">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Totalt Antall Klikk</div>
+        <div class="stat-value" id="stat-total-clicks">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Mest Populære Slug</div>
+        <div class="stat-value" id="stat-top-slug" style="font-size: 1.15rem; word-break: break-all;">-</div>
+      </div>
+    </div>
+
+    <!-- Skjema for å legge til nye bedrifter -->
+    <section class="section-card">
+      <div class="section-header">
+        <h2 class="section-title">Legg til ny omdirigering</h2>
+        <p class="section-desc">Knytt en unik NFC/QR-slug til bedriftens offisielle Google Review-lenke.</p>
+      </div>
+
+      <form id="redirect-form" onsubmit="handleFormSubmit(event)">
+        <div class="form-grid">
+          <div class="input-group">
+            <label for="input-slug" class="input-label">Kunde-ID / Slug (f.eks. kafe-hansen)</label>
+            <input
+              type="text"
+              id="input-slug"
+              class="input-field mono"
+              placeholder="kafe-hansen"
+              required
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="input-url" class="input-label">Google Review URL</label>
+            <input
+              type="url"
+              id="input-url"
+              class="input-field"
+              placeholder="https://g.page/r/kafe-hansen/review"
+              required
+              autocomplete="off"
+            />
+          </div>
+
+          <button type="submit" id="btn-save" class="btn-primary">
+            Lagre
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tabell med eksisterende omdirigeringer -->
+    <section class="section-card">
+      <div class="table-toolbar">
+        <div>
+          <h2 class="section-title">Registrerte omdirigeringer</h2>
+          <p class="section-desc">Oversikt over alle programmerte NFC- og QR-lenker.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input
+            type="text"
+            id="table-search"
+            class="search-input"
+            placeholder="Søk på kunde-ID eller lenke..."
+            oninput="handleSearch(this.value)"
+          />
+          <button class="btn-secondary" onclick="loadRedirects()" title="Oppdater tabell">
+            Oppdater
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Kunde-ID (Slug)</th>
+              <th>Destinasjonslenke</th>
+              <th class="num">Antall klikk</th>
+              <th style="text-align: right;">Handlinger</th>
+            </tr>
+          </thead>
+          <tbody id="redirects-table-body">
+            <tr>
+              <td colspan="4" class="empty-state">Laster inn omdirigeringer...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: SQL Setup for Supabase -->
+  <div id="modal-sql" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="section-title">Supabase Database Setup</h3>
+        <button class="modal-close" onclick="closeSqlModal()">&times;</button>
+      </div>
+      <p class="section-desc">
+        Kopier og kjør dette SQL-skriptet i <strong>Supabase SQL Editor</strong> for å opprette <code>redirects</code>-tabellen med riktige tilgangsregler (RLS):
+      </p>
+      <div class="code-snippet" id="sql-text">-- 1. Opprett redirects-tabell
+create table if not exists public.redirects (
+  id text primary key,
+  google_url text not null,
+  clicks bigint default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 2. Aktiver Row Level Security (RLS)
+alter table public.redirects enable row level security;
+
+-- 3. Tillat offentlig lesing (for omdirigering og admin)
+create policy "Allow public read" on public.redirects
+  for select using (true);
+
+-- 4. Tillat offentlig opprettelse
+create policy "Allow public insert" on public.redirects
+  for insert with check (true);
+
+-- 5. Tillat klikk-oppdatering
+create policy "Allow public update" on public.redirects
+  for update using (true);
+
+-- 6. Tillat sletting
+create policy "Allow public delete" on public.redirects
+  for delete using (true);</div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button class="btn-primary" onclick="copySqlCode()">Kopier SQL</button>
+        <button class="btn-secondary" onclick="closeSqlModal()">Lukk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Konfigurasjon av Supabase nøkler -->
+  <div id="modal-config" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="section-title">Supabase Innstillinger</h3>
+        <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+      </div>
+      <p class="section-desc" style="margin-bottom: 1rem;">
+        Du kan enten legge inn nøklene øverst i <code>admin.html</code> og <code>r.html</code>, eller lagre dem her for testing i nettleseren.
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="input-group">
+          <label class="input-label">Supabase Prosjekt URL</label>
+          <input type="text" id="config-url" class="input-field mono" placeholder="https://ditt-prosjekt.supabase.co" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Supabase Anon Key</label>
+          <input type="text" id="config-key" class="input-field mono" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Eget Domenenavn for "Kopier lenke" (valgfritt)</label>
+          <input type="text" id="config-custom-domain" class="input-field" placeholder="dittdomene.no (la stå tomt for automatisk aktivt domene)" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+          <button class="btn-primary" onclick="saveConfigSettings()">Lagre innstillinger</button>
+          <button class="btn-secondary" onclick="closeConfigModal()">Avbryt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: QR-kode visning og test -->
+  <div id="modal-qr" class="modal-overlay">
+    <div class="modal-card" style="text-align: center;">
+      <div class="modal-header">
+        <h3 class="section-title" id="qr-modal-title">QR-kode & NFC Lenke</h3>
+        <button class="modal-close" onclick="closeQrModal()">&times;</button>
+      </div>
+      <div class="qr-preview-box">
+        <canvas id="qr-canvas"></canvas>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #0f172a; word-break: break-all;" id="qr-modal-url"></div>
+      </div>
+      <div style="display: flex; justify-content: center; gap: 0.5rem;">
+        <button class="btn-primary" onclick="downloadQrCode()">Last ned PNG</button>
+        <button class="btn-secondary" onclick="closeQrModal()">Lukk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast beskjed -->
+  <div id="toast" class="toast">Varsel</div>
+
+  <script>
+    // =========================================================================
+    // 1. SUPABASE KONFIGURASJON
+    // Fyll inn din Supabase Prosjekt-URL og public anon key her:
+    // =========================================================================
+    const SUPABASE_URL = 'https://DITT-PROSJEKT.supabase.co';
+    const SUPABASE_ANON_KEY = 'DIN-ANON-KEY-HER';
+    // =========================================================================
+
+    let supabaseClient = null;
+    let cachedRedirects = [];
+    let currentFilter = '';
+
+    // Hent aktive credentials
+    function getCredentials() {
+      const isPlaceholder = !SUPABASE_URL || SUPABASE_URL.includes('DITT-PROSJEKT');
+      if (!isPlaceholder) {
+        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isStatic: true };
+      }
+      try {
+        const stored = localStorage.getItem('supabase_config');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.url && parsed.key) return parsed;
+        }
+      } catch (e) {}
+      return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isDefault: true };
+    }
+
+    // Initialiser Supabase klient
+    function initSupabase() {
+      const creds = getCredentials();
+      const banner = document.getElementById('connection-banner');
+
+      if (creds.isDefault || !creds.url || creds.url.includes('DITT-PROSJEKT')) {
+        banner.style.display = 'flex';
+        banner.className = 'status-banner warning';
+        document.getElementById('banner-title').textContent = 'Supabase ikke tilkoblet: ';
+        document.getElementById('banner-text').textContent = 'Fyll inn nøkler i admin.html eller via Innstillinger-knappen.';
+        return null;
+      }
+
+      try {
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+          supabaseClient = supabase.createClient(creds.url, creds.key);
+          banner.style.display = 'flex';
+          banner.className = 'status-banner';
+          document.getElementById('banner-title').textContent = 'Supabase tilkoblet: ';
+          document.getElementById('banner-text').textContent = creds.url;
+          return supabaseClient;
+        }
+      } catch (err) {
+        console.error('Kunne ikke koble til Supabase:', err);
+      }
+      return null;
+    }
+
+    // Vis toast
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast' + (isError ? ' error' : '') + ' show';
+      setTimeout(() => {
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    // Generer full omdirigeringsadresse
+    function buildRedirectUrl(id) {
+      let customDomain = '';
+      try {
+        customDomain = localStorage.getItem('custom_domain') || '';
+      } catch (e) {}
+
+      if (customDomain && customDomain.trim() !== '') {
+        let clean = customDomain.trim().replace(/\/$/, '');
+        if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+          clean = 'https://' + clean;
+        }
+        return `${clean}/r.html?id=${encodeURIComponent(id)}`;
+      }
+
+      // Bruk gjeldende opprinnelse
+      const origin = window.location.origin;
+      return `${origin}/r.html?id=${encodeURIComponent(id)}`;
+    }
+
+    // Last data fra Supabase (eller lokalt mock minne hvis ikke konfigurert)
+    async function loadRedirects() {
+      const tbody = document.getElementById('redirects-table-body');
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Henter omdirigeringer...</td></tr>';
+
+      const client = initSupabase();
+
+      if (!client) {
+        // Fallback for lokal testing
+        try {
+          const stored = localStorage.getItem('mock_redirects');
+          cachedRedirects = stored ? JSON.parse(stored) : [
+            { id: 'kafe-hansen', google_url: 'https://maps.app.goo.gl/kafe-hansen', clicks: 42 },
+            { id: 'oslo-barbershop', google_url: 'https://g.page/r/oslo-barbershop/review', clicks: 128 },
+            { id: 'bakeri-nord', google_url: 'https://maps.app.goo.gl/bakeri-nord', clicks: 15 }
+          ];
+          if (!stored) {
+            localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
+          }
+        } catch (e) {
+          cachedRedirects = [];
+        }
+        renderTable();
+        updateStats();
+        return;
+      }
+
+      try {
+        const { data, error } = await client
+          .from('redirects')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        cachedRedirects = data || [];
+        renderTable();
+        updateStats();
+      } catch (err) {
+        console.error('Feil ved henting:', err);
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state" style="color: #f87171;">Kunne ikke hente data fra Supabase: ${escapeHtml(err.message || 'Ukjent feil')}</td></tr>`;
+        showToast('Feil ved henting fra Supabase', true);
+      }
+    }
+
+    // Render tabell
+    function renderTable() {
+      const tbody = document.getElementById('redirects-table-body');
+      const filter = currentFilter.toLowerCase().trim();
+
+      const filtered = cachedRedirects.filter(item => {
+        if (!filter) return true;
+        return (item.id && item.id.toLowerCase().includes(filter)) ||
+               (item.google_url && item.google_url.toLowerCase().includes(filter));
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="empty-state">
+              <div class="empty-title">Ingen omdirigeringer funnet</div>
+              <div>Bruk skjemaet ovenfor for å registrere din første bedrift.</div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => {
+        const safeId = escapeHtml(item.id);
+        const safeUrl = escapeHtml(item.google_url);
+        const clicks = Number(item.clicks) || 0;
+
+        return `
+          <tr>
+            <td>
+              <span class="slug-cell">${safeId}</span>
+            </td>
+            <td>
+              <div class="url-cell">
+                <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="url-link" title="${safeUrl}">
+                  ${safeUrl}
+                </a>
+              </div>
+            </td>
+            <td class="num">
+              <span class="click-badge">${clicks}</span>
+            </td>
+            <td>
+              <div class="actions-cell">
+                <button class="btn-action copy" onclick="copyRedirectLink('${safeId}')" title="Kopier NFC/QR-lenke">
+                  Kopier lenke
+                </button>
+                <button class="btn-action qr" onclick="showQrModal('${safeId}', '${safeUrl}')" title="Vis QR-kode">
+                  QR
+                </button>
+                <button class="btn-action" onclick="testRedirect('${safeId}')" title="Test omdirigering">
+                  Test
+                </button>
+                <button class="btn-action delete" onclick="deleteRedirect('${safeId}')" title="Slett oppføring">
+                  Slett
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Oppdater oppsummeringstall
+    function updateStats() {
+      document.getElementById('stat-total-links').textContent = cachedRedirects.length;
+      const totalClicks = cachedRedirects.reduce((acc, curr) => acc + (Number(curr.clicks) || 0), 0);
+      document.getElementById('stat-total-clicks').textContent = totalClicks;
+
+      if (cachedRedirects.length > 0) {
+        const top = [...cachedRedirects].sort((a, b) => (Number(b.clicks) || 0) - (Number(a.clicks) || 0))[0];
+        document.getElementById('stat-top-slug').textContent = `${top.id} (${top.clicks || 0})`;
+      } else {
+        document.getElementById('stat-top-slug').textContent = '-';
+      }
+    }
+
+    // Skjema-innsending (Lagre)
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const slugInput = document.getElementById('input-slug');
+      const urlInput = document.getElementById('input-url');
+      const btnSave = document.getElementById('btn-save');
+
+      let slug = slugInput.value.trim().toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-_]/g, '');
+
+      let url = urlInput.value.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+
+      if (!slug) {
+        showToast('Vennligst oppgi en gyldig slug / kunde-ID', true);
+        return;
+      }
+
+      btnSave.disabled = true;
+      btnSave.textContent = 'Lagrer...';
+
+      const client = initSupabase();
+
+      if (!client) {
+        // Fallback for lokal testing
+        const existingIdx = cachedRedirects.findIndex(r => r.id === slug);
+        if (existingIdx >= 0) {
+          cachedRedirects[existingIdx].google_url = url;
+        } else {
+          cachedRedirects.unshift({ id: slug, google_url: url, clicks: 0, created_at: new Date().toISOString() });
+        }
+        try {
+          localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
+        } catch (e) {}
+
+        slugInput.value = '';
+        urlInput.value = '';
+        btnSave.disabled = false;
+        btnSave.textContent = 'Lagre';
+        showToast(`Lagret omdirigering for "${slug}"`);
+        renderTable();
+        updateStats();
+        return;
+      }
+
+      try {
+        const { error } = await client
+          .from('redirects')
+          .upsert({ id: slug, google_url: url }, { onConflict: 'id' });
+
+        if (error) {
+          throw error;
+        }
+
+        slugInput.value = '';
+        urlInput.value = '';
+        showToast(`Omdirigering for "${slug}" ble lagret!`);
+        await loadRedirects();
+      } catch (err) {
+        console.error('Feil under lagring:', err);
+        showToast(`Kunne ikke lagre: ${err.message}`, true);
+      } finally {
+        btnSave.disabled = false;
+        btnSave.textContent = 'Lagre';
+      }
+    }
+
+    // Kopier lenke-knapp
+    function copyRedirectLink(id) {
+      const fullUrl = buildRedirectUrl(id);
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        showToast(`Kopierte lenke: ${fullUrl}`);
+      }).catch(() => {
+        // Fallback
+        const temp = document.createElement('textarea');
+        temp.value = fullUrl;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showToast(`Kopierte lenke: ${fullUrl}`);
+      });
+    }
+
+    // Test omdirigering i ny fane
+    function testRedirect(id) {
+      const url = `r.html?id=${encodeURIComponent(id)}`;
+      window.open(url, '_blank');
+    }
+
+    // Slett-knapp
+    async function deleteRedirect(id) {
+      if (!confirm(`Er du sikker på at du vil slette omdirigeringen for "${id}"?`)) {
+        return;
+      }
+
+      const client = initSupabase();
+
+      if (!client) {
+        cachedRedirects = cachedRedirects.filter(r => r.id !== id);
+        try {
+          localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
+        } catch (e) {}
+        showToast(`Slettet "${id}"`);
+        renderTable();
+        updateStats();
+        return;
+      }
+
+      try {
+        const { error } = await client
+          .from('redirects')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        showToast(`Slettet "${id}"`);
+        await loadRedirects();
+      } catch (err) {
+        console.error('Feil ved sletting:', err);
+        showToast(`Kunne ikke slette: ${err.message}`, true);
+      }
+    }
+
+    // Søk i tabell
+    function handleSearch(val) {
+      currentFilter = val;
+      renderTable();
+    }
+
+    // QR-Modal
+    function showQrModal(id, url) {
+      const modal = document.getElementById('modal-qr');
+      const targetUrl = buildRedirectUrl(id);
+      document.getElementById('qr-modal-title').textContent = `QR-kode for ${id}`;
+      document.getElementById('qr-modal-url').textContent = targetUrl;
+      const canvas = document.getElementById('qr-canvas');
+
+      if (typeof QRCode !== 'undefined') {
+        QRCode.toCanvas(canvas, targetUrl, { width: 220, margin: 2 }, function(err) {
+          if (err) console.error(err);
+        });
+      }
+      modal.style.display = 'flex';
+    }
+
+    function closeQrModal() {
+      document.getElementById('modal-qr').style.display = 'none';
+    }
+
+    function downloadQrCode() {
+      const canvas = document.getElementById('qr-canvas');
+      const a = document.createElement('a');
+      a.download = `qr-nfc-redirect.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+
+    // SQL Modal
+    function openSqlModal() {
+      document.getElementById('modal-sql').style.display = 'flex';
+    }
+    function closeSqlModal() {
+      document.getElementById('modal-sql').style.display = 'none';
+    }
+    function copySqlCode() {
+      const code = document.getElementById('sql-text').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('SQL-skript kopiert til utklippstavlen!');
+      });
+    }
+
+    // Config Modal
+    function openConfigModal() {
+      const creds = getCredentials();
+      document.getElementById('config-url').value = creds.url && !creds.url.includes('DITT-PROSJEKT') ? creds.url : '';
+      document.getElementById('config-key').value = creds.key && creds.key !== 'DIN-ANON-KEY-HER' ? creds.key : '';
+      try {
+        document.getElementById('config-custom-domain').value = localStorage.getItem('custom_domain') || '';
+      } catch (e) {}
+      document.getElementById('modal-config').style.display = 'flex';
+    }
+    function closeConfigModal() {
+      document.getElementById('modal-config').style.display = 'none';
+    }
+    function saveConfigSettings() {
+      const url = document.getElementById('config-url').value.trim();
+      const key = document.getElementById('config-key').value.trim();
+      const domain = document.getElementById('config-custom-domain').value.trim();
+
+      if (url && key) {
+        localStorage.setItem('supabase_config', JSON.stringify({ url, key }));
+      }
+      if (domain) {
+        localStorage.setItem('custom_domain', domain);
+      } else {
+        localStorage.removeItem('custom_domain');
+      }
+
+      closeConfigModal();
+      showToast('Innstillinger lagret!');
+      initSupabase();
+      loadRedirects();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Initialiser ved start
+    document.addEventListener('DOMContentLoaded', () => {
+      loadRedirects();
+    });
+  </script>
+</body>
+</html>
