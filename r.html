@@ -154,18 +154,13 @@
   <script>
     // =========================================================================
     // 1. SUPABASE KONFIGURASJON
-    // Fyll inn din Supabase Prosjekt-URL og public anon key her:
     // =========================================================================
-    const SUPABASE_URL = 'https://eqdxlbhupyvvfhoomliu.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A';
+    const SUPABASE_URL = '';
+    const SUPABASE_ANON_KEY = '';
     // =========================================================================
 
     // Hjelpefunksjon for å hente lagret config (dersom satt via admin/lokal lagring for rask testing)
     function getActiveCredentials() {
-      const isPlaceholder = !SUPABASE_URL || SUPABASE_URL.includes('DITT-PROSJEKT');
-      if (!isPlaceholder) {
-        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
-      }
       try {
         const local = localStorage.getItem('supabase_config');
         if (local) {
@@ -173,6 +168,9 @@
           if (parsed.url && parsed.key) return parsed;
         }
       } catch (e) {}
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('DITT-PROSJEKT')) {
+        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
+      }
       return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isDefault: true };
     }
 

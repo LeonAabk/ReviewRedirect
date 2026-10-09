@@ -719,9 +719,8 @@ create policy "Allow public delete" on public.redirects
       <p class="section-desc" style="margin-bottom: 1.25rem;">Oppgi admin-passord for å åpne kontrollpanelet.</p>
       <form onsubmit="handleAuthSubmit(event)">
         <div class="input-group" style="text-align: left; margin-bottom: 1rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+          <div style="margin-bottom: 0.25rem;">
             <label class="input-label" style="margin: 0;">Admin-passord</label>
-            <span id="auth-hint" style="font-size: 0.75rem; color: #38bdf8; font-family: monospace;">Standard: admin</span>
           </div>
           <input type="password" id="auth-password-input" class="input-field" placeholder="Skriv inn passord..." required autofocus />
           <div id="auth-error-msg" style="display: none; color: #f87171; font-size: 0.75rem; margin-top: 0.35rem;">Feil passord. Prøv igjen.</div>
@@ -790,10 +789,10 @@ create policy "Allow public delete" on public.redirects
   <script>
     // =========================================================================
     // 1. SUPABASE KONFIGURASJON
-    // Fyll inn din Supabase Prosjekt-URL og public anon key her:
+    // Konfigureres via Innstillinger i grensesnittet (lagres sikkert i nettleseren)
     // =========================================================================
-    const SUPABASE_URL = 'https://eqdxlbhupyvvfhoomliu.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A';
+    const SUPABASE_URL = '';
+    const SUPABASE_ANON_KEY = '';
     // =========================================================================
 
     let supabaseClient = null;
@@ -802,10 +801,6 @@ create policy "Allow public delete" on public.redirects
 
     // Hent aktive credentials
     function getCredentials() {
-      const isPlaceholder = !SUPABASE_URL || SUPABASE_URL.includes('DITT-PROSJEKT');
-      if (!isPlaceholder) {
-        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isStatic: true };
-      }
       try {
         const stored = localStorage.getItem('supabase_config');
         if (stored) {
@@ -813,6 +808,9 @@ create policy "Allow public delete" on public.redirects
           if (parsed.url && parsed.key) return parsed;
         }
       } catch (e) {}
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('DITT-PROSJEKT')) {
+        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isStatic: true };
+      }
       return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isDefault: true };
     }
 
@@ -1186,8 +1184,6 @@ create policy "Allow public delete" on public.redirects
       const authModal = document.getElementById('modal-auth');
       if (!isUnlocked) {
         authModal.style.display = 'flex';
-        const currentPassword = localStorage.getItem('admin_password') || 'admin';
-        document.getElementById('auth-hint').style.display = (currentPassword === 'admin') ? 'inline' : 'none';
         document.getElementById('auth-password-input').value = '';
         document.getElementById('auth-error-msg').style.display = 'none';
       } else {

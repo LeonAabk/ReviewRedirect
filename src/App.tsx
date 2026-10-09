@@ -62,11 +62,13 @@ export default function App() {
 
   // Supabase konfigurasjon
   const [config, setConfig] = useState<SupabaseConfig>({
-    url: 'https://eqdxlbhupyvvfhoomliu.supabase.co',
-    key: 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A',
+    url: import.meta.env.VITE_SUPABASE_URL || '',
+    key: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
     customDomain: ''
   });
-  const [isConnectedToSupabase, setIsConnectedToSupabase] = useState(true);
+  const [isConnectedToSupabase, setIsConnectedToSupabase] = useState(
+    Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+  );
 
   // Hent aktiv Supabase klient
   const getSupabaseClient = () => {
@@ -118,10 +120,22 @@ export default function App() {
       if (storedConfig) {
         const parsed = JSON.parse(storedConfig);
         setConfig({
-          url: parsed.url || 'https://eqdxlbhupyvvfhoomliu.supabase.co',
-          key: parsed.key || 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A',
+          url: parsed.url || import.meta.env.VITE_SUPABASE_URL || '',
+          key: parsed.key || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           customDomain: customDomain || ''
         });
+        if (parsed.url && parsed.key) {
+          setIsConnectedToSupabase(true);
+        }
+      } else if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        setConfig({
+          url: import.meta.env.VITE_SUPABASE_URL,
+          key: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          customDomain: customDomain || ''
+        });
+        setIsConnectedToSupabase(true);
+      } else {
+        setIsConnectedToSupabase(false);
       }
 
       // Last admin-passord og sesjonsstatus
@@ -296,7 +310,9 @@ export default function App() {
     if (adminPassword) {
       localStorage.setItem('admin_password', adminPassword.trim());
     }
+    setIsSettingsOpen(false);
     showToast('Innstillinger lagret!');
+    loadLiveRedirects();
   };
 
   const handleUnlock = (e: React.FormEvent) => {
@@ -381,9 +397,6 @@ export default function App() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-300">Admin-passord</label>
-                {adminPassword === 'admin' && (
-                  <span className="text-[11px] text-sky-400 font-mono">Standard: admin</span>
-                )}
               </div>
               <div className="relative">
                 <input
@@ -955,7 +968,7 @@ export default function App() {
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Passordet som kreves for å åpne dette kontrollpanelet. Standard: <code>admin</code>.
+                    Passordet som kreves for å åpne dette kontrollpanelet.
                   </p>
                 </div>
 
