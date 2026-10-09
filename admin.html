@@ -1093,7 +1093,16 @@ create policy "Allow public delete" on public.redirects
     function testRedirect(id) {
       const url = `r.html?id=${encodeURIComponent(id)}`;
       window.open(url, '_blank');
+      showToast(`Tester omdirigering for "${id}"...`);
+      setTimeout(() => {
+        fetchRedirects();
+        updateStats();
+      }, 1500);
     }
+
+    window.addEventListener('focus', () => {
+      fetchRedirects();
+    });
 
     // Slett-knapp
     async function deleteRedirect(id) {

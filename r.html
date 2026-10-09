@@ -273,10 +273,23 @@
           await client
             .from('redirects')
             .update({ clicks: currentClicks + 1 })
-            .eq('id', redirectId);
+            .eq('id', data.id);
         } catch (updateErr) {
           console.warn('Kunne ikke inkrementere klikk-teller (RLS eller tillatelse):', updateErr);
         }
+
+        // Synkroniser lokal cache i localStorage dersom tilgjengelig
+        try {
+          const cached = localStorage.getItem('mock_redirects');
+          if (cached) {
+            const list = JSON.parse(cached);
+            const item = list.find(r => r.id.toLowerCase() === cleanId.toLowerCase());
+            if (item) {
+              item.clicks = currentClicks + 1;
+              localStorage.setItem('mock_redirects', JSON.stringify(list));
+            }
+          }
+        } catch (cacheErr) {}
 
         // 5. Umiddelbar omdirigering til google_url
         let targetUrl = data.google_url.trim();

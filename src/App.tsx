@@ -84,7 +84,19 @@ export default function App() {
   // Last live redirects fra Supabase
   const loadLiveRedirects = async () => {
     const client = getSupabaseClient();
-    if (!client) return;
+    if (!client) {
+      try {
+        const stored = localStorage.getItem('mock_redirects');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRedirects(parsed);
+            if (!selectedForCard) setSelectedForCard(parsed[0]);
+          }
+        }
+      } catch (e) {}
+      return;
+    }
     try {
       const { data, error } = await client.from('redirects').select('*');
       if (error) {
@@ -99,6 +111,10 @@ export default function App() {
           return (a.id || '').localeCompare(b.id || '');
         });
         setRedirects(sorted);
+        // Sync til localStorage mock_redirects så r.html har siste oppdaterte data
+        try {
+          localStorage.setItem('mock_redirects', JSON.stringify(sorted));
+        } catch (e) {}
         if (sorted.length > 0) {
           setSelectedForCard(prev => {
             if (!prev) return sorted[0];
@@ -117,23 +133,30 @@ export default function App() {
     try {
       const storedConfig = localStorage.getItem('supabase_config');
       const customDomain = localStorage.getItem('custom_domain') || '';
+      let activeUrl = '';
+      let activeKey = '';
+
       if (storedConfig) {
         const parsed = JSON.parse(storedConfig);
-        setConfig({
-          url: parsed.url || import.meta.env.VITE_SUPABASE_URL || '',
-          key: parsed.key || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          customDomain: customDomain || ''
-        });
-        if (parsed.url && parsed.key) {
-          setIsConnectedToSupabase(true);
-        }
+        activeUrl = parsed.url || import.meta.env.VITE_SUPABASE_URL || '';
+        activeKey = parsed.key || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
       } else if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        setConfig({
-          url: import.meta.env.VITE_SUPABASE_URL,
-          key: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          customDomain: customDomain || ''
-        });
+        activeUrl = import.meta.env.VITE_SUPABASE_URL;
+        activeKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      }
+
+      setConfig({
+        url: activeUrl,
+        key: activeKey,
+        customDomain: customDomain || ''
+      });
+
+      if (activeUrl && activeKey) {
         setIsConnectedToSupabase(true);
+        // Sikre at supabase_config ligger i localStorage så r.html og admin.html har tilgang
+        try {
+          localStorage.setItem('supabase_config', JSON.stringify({ url: activeUrl, key: activeKey }));
+        } catch (e) {}
       } else {
         setIsConnectedToSupabase(false);
       }
@@ -149,6 +172,15 @@ export default function App() {
 
     loadLiveRedirects();
   }, []);
+
+  // Lytt på vindusfokus for å hente ferske klikktall automatisk etter test i ny fane
+  useEffect(() => {
+    const handleFocus = () => {
+      loadLiveRedirects();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [config.url, config.key]);
 
   // Generer QR-kode når selectedForCard endrer seg
   useEffect(() => {
@@ -293,6 +325,33 @@ export default function App() {
     });
   };
 
+  const handleTestRedirect = (e: React.MouseEvent, item: RedirectItem) => {
+    // 1. Synkroniser config og oppdaterte redirects til localStorage slik at r.html umiddelbart har nyeste data
+    try {
+      if (config.url && config.key) {
+        localStorage.setItem('supabase_config', JSON.stringify({ url: config.url, key: config.key }));
+      }
+      localStorage.setItem('mock_redirects', JSON.stringify(redirects));
+    } catch (err) {}
+
+    // 2. Optimistisk oppdatering av klikkteller i tabellen
+    const updated = redirects.map(r => r.id === item.id ? { ...r, clicks: (r.clicks || 0) + 1 } : r);
+    setRedirects(updated);
+    if (selectedForCard?.id === item.id) {
+      setSelectedForCard(prev => prev ? { ...prev, clicks: prev.clicks + 1 } : null);
+    }
+    try {
+      localStorage.setItem('mock_redirects', JSON.stringify(updated));
+    } catch (err) {}
+
+    showToast(`Tester omdirigering for "${item.id}" (klikk registrert)`);
+
+    // 3. Last ferske data fra Supabase etter at r.html har fullført omdirigeringen
+    setTimeout(() => {
+      loadLiveRedirects();
+    }, 1500);
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     if (config.url && config.key) {
@@ -336,9 +395,22 @@ export default function App() {
     showToast('Dashboard låst.');
   };
 
-  const simulateNfcTap = () => {
+  const simulateNfcTap = async () => {
     if (!selectedForCard) return;
     setIsSimulatingNfc(true);
+
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client
+          .from('redirects')
+          .update({ clicks: (selectedForCard.clicks || 0) + 1 })
+          .eq('id', selectedForCard.id);
+      } catch (e) {
+        console.error('Kunne ikke oppdatere klikk i Supabase:', e);
+      }
+    }
+
     setTimeout(() => {
       // Inkrementer klikk
       const updated = redirects.map(item => {
@@ -355,6 +427,7 @@ export default function App() {
       setIsSimulatingNfc(false);
       showToast(`NFC-kort registrert! Videresender til: ${selectedForCard.google_url}`);
       window.open(selectedForCard.google_url, '_blank');
+      loadLiveRedirects();
     }, 700);
   };
 
@@ -708,11 +781,12 @@ export default function App() {
                             </button>
 
                             <a
-                              href={`/r.html?id=${encodeURIComponent(item.id)}`}
+                              href={buildFullUrl(item.id)}
+                              onClick={(e) => handleTestRedirect(e, item)}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-sky-300 border border-slate-700 transition"
-                              title="Test omdirigering nå"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-sky-950/60 text-xs font-medium text-sky-300 border border-slate-700 hover:border-sky-500/50 transition cursor-pointer"
+                              title={`Test omdirigering for ${item.id} -> ${item.google_url}`}
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                               <span>Test</span>
