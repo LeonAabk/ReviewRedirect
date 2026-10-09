@@ -92,11 +92,11 @@ export default function App() {
 
   // Supabase konfigurasjon
   const [config, setConfig] = useState<SupabaseConfig>({
-    url: '',
-    key: '',
+    url: 'https://eqdxlbhupyvvfhoomliu.supabase.co',
+    key: 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A',
     customDomain: ''
   });
-  const [isConnectedToSupabase, setIsConnectedToSupabase] = useState(false);
+  const [isConnectedToSupabase, setIsConnectedToSupabase] = useState(true);
   const [selectedFileView, setSelectedFileView] = useState<'r.html' | 'admin.html'>('r.html');
 
   // Last initielle data
@@ -108,13 +108,10 @@ export default function App() {
       if (storedConfig) {
         const parsed = JSON.parse(storedConfig);
         setConfig({
-          url: parsed.url || '',
-          key: parsed.key || '',
+          url: parsed.url || 'https://eqdxlbhupyvvfhoomliu.supabase.co',
+          key: parsed.key || 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A',
           customDomain: customDomain || ''
         });
-        if (parsed.url && parsed.key) {
-          setIsConnectedToSupabase(true);
-        }
       }
     } catch (e) {
       console.error(e);
