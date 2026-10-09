@@ -22,7 +22,11 @@ import {
   Sparkles,
   ArrowRight,
   Eye,
-  Download
+  Download,
+  GitBranch,
+  Terminal,
+  HelpCircle,
+  Globe
 } from 'lucide-react';
 
 interface RedirectItem {
@@ -73,7 +77,9 @@ create policy "Allow public delete" on public.redirects
   for delete using (true);`;
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'files' | 'nfc' | 'supabase'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'files' | 'nfc' | 'supabase' | 'github'>('dashboard');
+  const [ghUser, setGhUser] = useState('ditt-brukernavn');
+  const [ghRepo, setGhRepo] = useState('nfc-redirect');
   const [redirects, setRedirects] = useState<RedirectItem[]>([]);
   const [slugInput, setSlugInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
@@ -183,8 +189,12 @@ export default function App() {
       }
       return `${clean}/r.html?id=${encodeURIComponent(id)}`;
     }
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://dittdomene.no';
-    return `${origin}/r.html?id=${encodeURIComponent(id)}`;
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname || '/';
+      const dir = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+      return `${window.location.origin}${dir}r.html?id=${encodeURIComponent(id)}`;
+    }
+    return `https://dittdomene.no/r.html?id=${encodeURIComponent(id)}`;
   };
 
   const handleSaveRedirect = (e: React.FormEvent) => {
@@ -686,6 +696,17 @@ export default function App() {
               }`}
             >
               Supabase SQL Setup
+            </button>
+            <button
+              onClick={() => setActiveTab('github')}
+              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === 'github'
+                  ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              GitHub & Pages
             </button>
           </nav>
         </div>
@@ -1265,6 +1286,165 @@ export default function App() {
                   Lagre Innstillinger
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: GITHUB & GITHUB PAGES SETUP */}
+        {activeTab === 'github' && (
+          <div className="space-y-8">
+            {/* Status-kort */}
+            <div className="p-5 rounded-2xl bg-sky-950/40 border border-sky-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center font-bold">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Prosjektet er klargjort for GitHub!</h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Git-repo er initialisert, `.github/workflows/deploy.yml` er opprettet, og `base: './'` er konfigurert for GitHub Pages.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const commands = `git remote add origin https://github.com/${ghUser}/${ghRepo}.git\ngit branch -M main\ngit push -u origin main`;
+                    navigator.clipboard.writeText(commands);
+                    showToast('Kopierte git push-kommandoer!');
+                  }}
+                  className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Kopier Push-kommandoer
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Steg 1: Push-kommandoer generator */}
+              <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Terminal className="w-5 h-5 text-sky-400" />
+                    Kjør disse kommandoene for å pushe til GitHub
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Skriv inn ditt GitHub-brukernavn og repositorium nedenfor for å tilpasse kommandoene:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Ditt GitHub-brukernavn</label>
+                    <input
+                      type="text"
+                      value={ghUser}
+                      onChange={(e) => setGhUser(e.target.value.trim())}
+                      placeholder="LeonAabak"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Navn på GitHub-repo</label>
+                    <input
+                      type="text"
+                      value={ghRepo}
+                      onChange={(e) => setGhRepo(e.target.value.trim())}
+                      placeholder="nfc-redirect"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Kodeboks */}
+                <div className="relative">
+                  <pre className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-sky-300 overflow-x-auto leading-relaxed">
+                    <code>{`# 1. Koble til repositoriet ditt på GitHub:
+git remote add origin https://github.com/${ghUser}/${ghRepo}.git
+
+# 2. Sørg for at grenen heter 'main':
+git branch -M main
+
+# 3. Push koden opp til GitHub:
+git push -u origin main
+
+# HVIS GITHUB KLAGER ("remote contains work..."):
+# Dette skjer hvis du huket av for 'Add README' da du lagde repoet på GitHub.
+# Løs det enkelt med enten:
+git pull origin main --rebase
+git push -u origin main
+
+# ...eller overskriv med force:
+git push -u origin main --force`}</code>
+                  </pre>
+                  <button
+                    onClick={() => {
+                      const snippet = `git remote add origin https://github.com/${ghUser}/${ghRepo}.git\ngit branch -M main\ngit push -u origin main`;
+                      navigator.clipboard.writeText(snippet);
+                      showToast('Kopierte git push-kommando!');
+                    }}
+                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-sky-600/90 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Kopier
+                  </button>
+                </div>
+              </div>
+
+              {/* Steg 2: Aktivere GitHub Pages */}
+              <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-sky-400" />
+                    Aktivere GitHub Pages
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    To enkle måter å gjøre siden offentlig på nett gratis:
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                      <span>Metode 1: GitHub Actions (Anbefalt)</span>
+                    </div>
+                    <ol className="list-decimal list-inside text-xs text-slate-400 space-y-1.5">
+                      <li>Gå til GitHub-repositoriet ditt.</li>
+                      <li>Trykk <strong>Settings → Pages</strong>.</li>
+                      <li>Under <strong>Source</strong>, velg <strong>GitHub Actions</strong>.</li>
+                      <li>Ferdig! Filen <code className="text-sky-300">.github/workflows/deploy.yml</code> bygger og publiserer automatisk.</li>
+                    </ol>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                      <span>Metode 2: Deploy fra /docs</span>
+                    </div>
+                    <ol className="list-decimal list-inside text-xs text-slate-400 space-y-1.5">
+                      <li>Gå til <strong>Settings → Pages</strong>.</li>
+                      <li>Velg <strong>Deploy from a branch</strong>.</li>
+                      <li>Velg <strong>main</strong> og mappen <strong>/docs</strong>.</li>
+                      <li>Trykk <strong>Save</strong>.</li>
+                    </ol>
+                  </div>
+
+                  {/* Forventede adresser på GitHub Pages */}
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="text-xs font-bold text-slate-300">
+                      Dine adresser når GitHub Pages er aktivert:
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400 space-y-1">
+                      <div>
+                        Omdirigering: <span className="text-sky-400">https://{ghUser}.github.io/{ghRepo}/r.html?id=kafe-hansen</span>
+                      </div>
+                      <div>
+                        Admin: <span className="text-purple-400">https://{ghUser}.github.io/{ghRepo}/admin.html</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

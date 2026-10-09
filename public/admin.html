@@ -843,9 +843,10 @@ create policy "Allow public delete" on public.redirects
         return `${clean}/r.html?id=${encodeURIComponent(id)}`;
       }
 
-      // Bruk gjeldende opprinnelse
-      const origin = window.location.origin;
-      return `${origin}/r.html?id=${encodeURIComponent(id)}`;
+      // Beregn mappe automatisk (støtter både rot og GitHub Pages /sub-repo/)
+      const pathname = window.location.pathname || '/';
+      const dir = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+      return `${window.location.origin}${dir}r.html?id=${encodeURIComponent(id)}`;
     }
 
     // Last data fra Supabase (eller lokalt mock minne hvis ikke konfigurert)
