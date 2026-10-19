@@ -39,6 +39,9 @@ interface RedirectItem {
   created_at?: string;
 }
 
+const DEFAULT_SUPABASE_URL = 'https://eqdxlbhupyvvfhoomliu.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A';
+
 interface SupabaseConfig {
   url: string;
   key: string;
@@ -93,15 +96,6 @@ export default function App() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Supabase konfigurasjon
-  const [config, setConfig] = useState<SupabaseConfig>({
-    url: import.meta.env.VITE_SUPABASE_URL || '',
-    key: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-    customDomain: ''
-  });
-  const [isConnectedToSupabase, setIsConnectedToSupabase] = useState(
-    Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
-  );
-
   const isPlaceholderConfig = (u: string, k: string) => {
     if (!u || !k) return true;
     const lu = u.toLowerCase();
@@ -109,10 +103,38 @@ export default function App() {
     return lu.includes('ditt-prosjekt') || lu.includes('example') || lk.includes('din-offentlige') || lk.includes('din-anon') || lk === 'admin';
   };
 
+  const [config, setConfig] = useState<SupabaseConfig>(() => {
+    let url = import.meta.env.VITE_SUPABASE_URL || '';
+    let key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    let customDomain = '';
+    if (typeof window !== 'undefined') {
+      customDomain = localStorage.getItem('custom_domain') || '';
+      try {
+        const stored = localStorage.getItem('supabase_config');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.url && parsed.key && !isPlaceholderConfig(parsed.url, parsed.key)) {
+            url = parsed.url;
+            key = parsed.key;
+          }
+        }
+      } catch (e) {}
+    }
+    if (!url || isPlaceholderConfig(url, key)) {
+      url = DEFAULT_SUPABASE_URL;
+    }
+    if (!key || isPlaceholderConfig(url, key)) {
+      key = DEFAULT_SUPABASE_ANON_KEY;
+    }
+    return { url, key, customDomain };
+  });
+
+  const [isConnectedToSupabase, setIsConnectedToSupabase] = useState<boolean>(true);
+
   // Hent aktiv Supabase klient
   const getSupabaseClient = (overrideUrl?: string, overrideKey?: string) => {
-    const url = overrideUrl || config.url;
-    const key = overrideKey || config.key;
+    const url = overrideUrl || config.url || DEFAULT_SUPABASE_URL;
+    const key = overrideKey || config.key || DEFAULT_SUPABASE_ANON_KEY;
     if (isPlaceholderConfig(url, key)) return null;
     try {
       return createClient(url, key);
@@ -165,60 +187,45 @@ export default function App() {
     }
   };
 
-  // Last live redirects fra felles server (med automatisk synkronisering av eksisterende kort)
+  // Last live redirects fra Supabase (og synkroniser med felles server dersom den kjører)
   const loadLiveRedirects = async () => {
-    try {
-      const res = await fetch('/api/redirects');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.items)) {
-          let mergedList = [...json.items];
-
-          // Sjekk om det finnes eksisterende kort i localStorage som må synkroniseres til serveren
-          try {
-            const localRaw = localStorage.getItem('mock_redirects');
-            if (localRaw) {
-              const localList: RedirectItem[] = JSON.parse(localRaw);
-              const missingOnServer = localList.filter(
-                localItem => !json.items.some((serverItem: RedirectItem) => serverItem.id.toLowerCase() === localItem.id.toLowerCase())
-              );
-              if (missingOnServer.length > 0) {
-                console.log('Synkroniserer lokale kort til felles server:', missingOnServer);
-                await fetch('/api/redirects', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ items: localList })
-                });
-                const refreshRes = await fetch('/api/redirects');
-                if (refreshRes.ok) {
-                  const refreshJson = await refreshRes.json();
-                  if (refreshJson.items) mergedList = refreshJson.items;
-                }
-              }
-            }
-          } catch (syncErr) {
-            console.warn('Lokal synk feilet:', syncErr);
-          }
-
-          applyRedirectData(mergedList);
-          return;
-        }
-      }
-    } catch (apiErr) {
-      console.warn('Server API ikke tilgjengelig, prøver Supabase/lokalt:', apiErr);
-    }
-
-    // Fallback: Hvis Supabase er tilkoblet
+    // 1. Primærkilde: Supabase
     const client = getSupabaseClient();
     if (client) {
       try {
         const { data, error } = await client.from('redirects').select('*');
-        if (!error && data) {
+        if (!error && Array.isArray(data) && data.length > 0) {
           applyRedirectData(data);
           setIsConnectedToSupabase(true);
+
+          // Hold også lokal express-server i sync dersom den kjører lokalt
+          try {
+            fetch('/api/redirects', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items: data })
+            }).catch(() => {});
+          } catch (e) {}
+
           return;
         }
-      } catch (e) {}
+      } catch (sbErr) {
+        console.warn('Supabase henting feilet, prøver server API/lokalt:', sbErr);
+      }
+    }
+
+    // 2. Sekundærkilde: Lokal server-API (/api/redirects) hvis aktiv
+    try {
+      const res = await fetch('/api/redirects');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.items) && json.items.length > 0) {
+          applyRedirectData(json.items);
+          return;
+        }
+      }
+    } catch (apiErr) {
+      // Forventet på GitHub Pages uten Node.js server
     }
 
     loadMockFallback();
@@ -230,24 +237,59 @@ export default function App() {
       let itemsToSync = [...redirects];
       const localRaw = localStorage.getItem('mock_redirects');
       if (localRaw) {
-        const localList: RedirectItem[] = JSON.parse(localRaw);
-        for (const it of localList) {
-          if (!itemsToSync.some(r => r.id.toLowerCase() === it.id.toLowerCase())) {
-            itemsToSync.push(it);
+        try {
+          const localList: RedirectItem[] = JSON.parse(localRaw);
+          for (const it of localList) {
+            if (!itemsToSync.some(r => r.id.toLowerCase() === it.id.toLowerCase())) {
+              itemsToSync.push(it);
+            }
           }
+        } catch (e) {}
+      }
+
+      let syncedToSupabase = false;
+      const client = getSupabaseClient();
+      if (client) {
+        try {
+          const cleanItems = itemsToSync.map(it => ({
+            id: it.id.trim().toLowerCase(),
+            google_url: it.google_url.trim(),
+            clicks: it.clicks || 0
+          }));
+          const { error } = await client
+            .from('redirects')
+            .upsert(cleanItems, { onConflict: 'id' });
+          if (!error) {
+            syncedToSupabase = true;
+            setIsConnectedToSupabase(true);
+          } else {
+            console.warn('Supabase upsert feilet:', error);
+          }
+        } catch (sbErr) {
+          console.warn('Supabase sync feilet:', sbErr);
         }
       }
-      const res = await fetch('/api/redirects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: itemsToSync })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.items) {
-          applyRedirectData(json.items);
+
+      // Synkroniser også til eventuell aktiv Express-server
+      let syncedToServer = false;
+      try {
+        const res = await fetch('/api/redirects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: itemsToSync })
+        });
+        if (res.ok) {
+          syncedToServer = true;
+          const json = await res.json();
+          if (json.items) {
+            itemsToSync = json.items;
+          }
         }
-        showToast(`Synkroniserte ${itemsToSync.length} kort til felles server!`);
+      } catch (e) {}
+
+      if (syncedToSupabase || syncedToServer) {
+        applyRedirectData(itemsToSync);
+        showToast(`Synkroniserte ${itemsToSync.length} kort til skyen!`);
       } else {
         showToast('Kunne ikke synkronisere til server');
       }
@@ -262,6 +304,8 @@ export default function App() {
   useEffect(() => {
     if (!redirectParamId) return;
     const clean = redirectParamId.trim().toLowerCase();
+
+    // 1. Sjekk felles server API dersom tilgjengelig
     fetch(`/api/redirect/${encodeURIComponent(clean)}`)
       .then(res => res.json())
       .then(data => {
@@ -271,26 +315,52 @@ export default function App() {
           setRedirectTargetUrl(url);
           setRedirectStatus('success');
           window.location.href = url;
-        } else {
+          return;
+        }
+        throw new Error('Ikke funnet på server');
+      })
+      .catch(async () => {
+        // 2. Supabase oppslag (primært på GitHub Pages)
+        const client = getSupabaseClient();
+        if (client) {
           try {
-            const raw = localStorage.getItem('mock_redirects');
-            if (raw) {
-              const list: RedirectItem[] = JSON.parse(raw);
-              const found = list.find(r => r.id.toLowerCase() === clean);
-              if (found && found.google_url) {
-                let url = found.google_url;
-                if (!url.startsWith('http')) url = 'https://' + url;
-                setRedirectTargetUrl(url);
-                setRedirectStatus('success');
-                window.location.href = url;
-                return;
-              }
+            const { data, error } = await client
+              .from('redirects')
+              .select('id, google_url, clicks')
+              .ilike('id', clean)
+              .maybeSingle();
+
+            if (!error && data && data.google_url) {
+              let url = data.google_url;
+              if (!url.startsWith('http')) url = 'https://' + url;
+              setRedirectTargetUrl(url);
+              setRedirectStatus('success');
+              try {
+                await client.from('redirects').update({ clicks: (Number(data.clicks) || 0) + 1 }).eq('id', data.id);
+              } catch (e) {}
+              window.location.href = url;
+              return;
             }
           } catch (e) {}
-          setRedirectStatus('not_found');
         }
-      })
-      .catch(() => {
+
+        // 3. Fallback til lokal cache
+        try {
+          const raw = localStorage.getItem('mock_redirects');
+          if (raw) {
+            const list: RedirectItem[] = JSON.parse(raw);
+            const found = list.find(r => r.id.toLowerCase() === clean);
+            if (found && found.google_url) {
+              let url = found.google_url;
+              if (!url.startsWith('http')) url = 'https://' + url;
+              setRedirectTargetUrl(url);
+              setRedirectStatus('success');
+              window.location.href = url;
+              return;
+            }
+          }
+        } catch (e) {}
+
         setRedirectStatus('not_found');
       });
   }, [redirectParamId]);
@@ -324,17 +394,20 @@ export default function App() {
         }
       }
 
+      if (!activeUrl || isPlaceholderConfig(activeUrl, activeKey)) {
+        activeUrl = DEFAULT_SUPABASE_URL;
+      }
+      if (!activeKey || isPlaceholderConfig(activeUrl, activeKey)) {
+        activeKey = DEFAULT_SUPABASE_ANON_KEY;
+      }
+
       setConfig({
         url: activeUrl,
         key: activeKey,
         customDomain: customDomain || ''
       });
 
-      if (activeUrl && activeKey && !isPlaceholderConfig(activeUrl, activeKey)) {
-        setIsConnectedToSupabase(true);
-      } else {
-        setIsConnectedToSupabase(false);
-      }
+      setIsConnectedToSupabase(Boolean(activeUrl && activeKey && !isPlaceholderConfig(activeUrl, activeKey)));
 
       // Last admin-passord og sesjonsstatus
       const savedPassword = localStorage.getItem('admin_password') || 'admin';
