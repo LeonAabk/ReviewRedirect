@@ -406,132 +406,104 @@
 
     // Hovedfunksjon for omdirigering
     async function executeRedirect() {
-      // 1. Les URL-parameteret ?id=...
+      // 1. Les URL-parameter (?id=, ?slug=, ?card=, ?kort=) eller hash (#slug)
       const urlParams = new URLSearchParams(window.location.search);
-      const redirectId = urlParams.get('id');
+      let redirectId = urlParams.get('id') || urlParams.get('slug') || urlParams.get('card') || urlParams.get('kort');
+
+      if (!redirectId && window.location.hash) {
+        const hash = window.location.hash.replace(/^#\/?/, '').trim();
+        if (hash) {
+          const hashParams = new URLSearchParams(hash);
+          redirectId = hashParams.get('id') || hashParams.get('slug') || hash;
+        }
+      }
 
       if (!redirectId || redirectId.trim() === '') {
         showError(
-          'Mangler Kunde-ID',
+          'Mangler Kort-ID',
           'Ingen gyldig parameter ble funnet i nettadressen.<br>Forventet format: <code>?id=kafe-hansen</code>.'
         );
         return;
       }
 
-      const creds = getActiveCredentials();
+      const cleanId = redirectId.trim().toLowerCase();
 
-      // Sjekk om Supabase-konfigurasjonen er fylt inn
-      if (creds.isDefault && (!creds.url || creds.url.includes('DITT-PROSJEKT'))) {
-        // Fallback for lokal testing før brukeren limer inn egne nøkler
-        try {
-          const localData = localStorage.getItem('mock_redirects');
-          if (localData) {
-            const list = JSON.parse(localData);
-            const found = list.find(item => item.id.toLowerCase() === redirectId.toLowerCase());
-            if (found && found.google_url) {
-              found.clicks = (found.clicks || 0) + 1;
-              localStorage.setItem('mock_redirects', JSON.stringify(list));
-              performRedirectAndClose(found.google_url);
-              return;
-            }
-          }
-        } catch (e) {}
-
-        showError(
-          'Supabase er ikke konfigurert',
-          'Fyll inn <code>SUPABASE_URL</code> og <code>SUPABASE_ANON_KEY</code> øverst i <code>r.html</code> eller konfigurer det i Dashboard.',
-          'Tips: Du kan konfigurere tilkoblingen under Dashboard -> Supabase Innstillinger.'
+      // 2. FØRSTE PRIORITET: Pre-injisert felles server-database (lynraskt, 0ms forsinkelse)
+      if (typeof window !== 'undefined' && Array.isArray((window as any).__SERVER_REDIRECTS__)) {
+        const preloaded = (window as any).__SERVER_REDIRECTS__.find(
+          (item: any) => item && item.id && item.id.toLowerCase() === cleanId
         );
-        return;
-      }
-
-      // Initialiser Supabase-klienten via offisiell CDN
-      if (typeof supabase === 'undefined' || !supabase.createClient) {
-        showError(
-          'Supabase bibliotek feilet',
-          'Kunne ikke laste Supabase JS fra CDN. Sjekk internettforbindelsen.'
-        );
-        return;
-      }
-
-      const client = supabase.createClient(creds.url, creds.key);
-
-      try {
-        const cleanId = redirectId.trim();
-        // 2. Oppslag i 'redirects'-tabellen etter id (case-insensitive)
-        const { data, error } = await client
-          .from('redirects')
-          .select('id, google_url, clicks')
-          .ilike('id', cleanId)
-          .maybeSingle();
-
-        if (error) {
-          console.warn('Supabase tilkoblingsvarsel:', error.message || error);
-          // Forsøk lokal fallback i tilfelle API-nøkkel feilet
+        if (preloaded && preloaded.google_url) {
           try {
-            const localData = localStorage.getItem('mock_redirects');
-            if (localData) {
-              const list = JSON.parse(localData);
-              const found = list.find(item => item.id.toLowerCase() === cleanId.toLowerCase());
-              if (found && found.google_url) {
-                found.clicks = (found.clicks || 0) + 1;
-                localStorage.setItem('mock_redirects', JSON.stringify(list));
-                performRedirectAndClose(found.google_url);
-                return;
-              }
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(`/api/click/${encodeURIComponent(cleanId)}`);
+            } else {
+              fetch(`/api/click/${encodeURIComponent(cleanId)}`, { method: 'POST', keepalive: true }).catch(() => {});
             }
           } catch (e) {}
-
-          showError(
-            'Tilkoblingsfeil',
-            `Kunne ikke koble til databasen. Sjekk at Supabase-nøklene i Dashboard er oppdatert.`
-          );
+          performRedirectAndClose(preloaded.google_url);
           return;
         }
-
-        // 3. Hvis raden ikke finnes: vis feilmelding
-        if (!data || !data.google_url) {
-          showError(
-            'Ugyldig eller ukjent lenke',
-            `Fant ingen registrert omdirigering for ID: <br><span class="error-badge">${escapeHtml(redirectId)}</span>`
-          );
-          return;
-        }
-
-        // 4. Inkrementer clicks-kolonnen med 1
-        const currentClicks = Number(data.clicks) || 0;
-        try {
-          await client
-            .from('redirects')
-            .update({ clicks: currentClicks + 1 })
-            .eq('id', data.id);
-        } catch (updateErr) {
-          console.warn('Kunne ikke inkrementere klikk-teller (RLS eller tillatelse):', updateErr);
-        }
-
-        // Synkroniser lokal cache i localStorage dersom tilgjengelig
-        try {
-          const cached = localStorage.getItem('mock_redirects');
-          if (cached) {
-            const list = JSON.parse(cached);
-            const item = list.find(r => r.id.toLowerCase() === cleanId.toLowerCase());
-            if (item) {
-              item.clicks = currentClicks + 1;
-              localStorage.setItem('mock_redirects', JSON.stringify(list));
-            }
-          }
-        } catch (cacheErr) {}
-
-        // 5. Umiddelbar omdirigering til google_url og automatisk lukking
-        performRedirectAndClose(data.google_url);
-
-      } catch (err) {
-        console.error('Uventet feil:', err);
-        showError(
-          'Systemfeil',
-          'Det oppstod en uventet feil under omdirigeringen.'
-        );
       }
+
+      // 3. ANDRE PRIORITET: Direkte oppslag mot felles server-API (/api/redirect/:id)
+      // Fungerer universelt for ALLE mobiltelefoner og kunder uten innlogging eller nøkler!
+      try {
+        const res = await fetch(`/api/redirect/${encodeURIComponent(cleanId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.success && json.item && json.item.google_url) {
+            performRedirectAndClose(json.item.google_url);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Server API utilgjengelig, prøver reserve-kilder:', err);
+      }
+
+      // 4. TREDJE PRIORITET: Supabase (dersom konfigurert med gyldige nøkler)
+      const creds = getActiveCredentials();
+      if (!creds.isDefault && creds.url && creds.key && typeof supabase !== 'undefined' && (supabase as any).createClient) {
+        try {
+          const client = (supabase as any).createClient(creds.url, creds.key);
+          const { data, error } = await client
+            .from('redirects')
+            .select('id, google_url, clicks')
+            .ilike('id', cleanId)
+            .maybeSingle();
+
+          if (!error && data && data.google_url) {
+            try {
+              client.from('redirects').update({ clicks: (Number(data.clicks) || 0) + 1 }).eq('id', data.id);
+            } catch (e) {}
+            performRedirectAndClose(data.google_url);
+            return;
+          }
+        } catch (e) {
+          console.warn('Supabase oppslag feilet:', e);
+        }
+      }
+
+      // 5. FJERDE PRIORITET: Lokal lagring / cache
+      try {
+        const localData = localStorage.getItem('mock_redirects');
+        if (localData) {
+          const list = JSON.parse(localData);
+          const found = list.find((item: any) => item.id.toLowerCase() === cleanId);
+          if (found && found.google_url) {
+            found.clicks = (found.clicks || 0) + 1;
+            localStorage.setItem('mock_redirects', JSON.stringify(list));
+            performRedirectAndClose(found.google_url);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // 6. Kort ikke funnet
+      showError(
+        'Kort ikke funnet',
+        `Fant ingen registrert omdirigering for ID: <br><span class="error-badge">${escapeHtml(cleanId)}</span><br><br>Sjekk at kortet er registrert og lagret i kontrollpanelet.`
+      );
     }
 
     function escapeHtml(str) {

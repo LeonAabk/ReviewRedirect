@@ -1,0 +1,6 @@
+{
+  "summary": "Plan for establishing central server-authoritative redirect storage and universal NFC tap handling. Fixes the issue where non-admin phones stop on the password lock screen or unconfigured database error, while fully preserving all previously scanned and saved redirects.",
+  "updatedAt": "2026-10-19T15:25:13.522794829Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

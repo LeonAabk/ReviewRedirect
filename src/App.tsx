@@ -28,7 +28,8 @@ import {
   Pencil,
   ArrowUpDown,
   Globe,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 
 interface RedirectItem {
@@ -64,6 +65,26 @@ export default function App() {
   const [selectedForCard, setSelectedForCard] = useState<RedirectItem | null>(null);
   const [cardQrDataUrl, setCardQrDataUrl] = useState<string>('');
   const [isSimulatingNfc, setIsSimulatingNfc] = useState(false);
+
+  // Root NFC omdirigering (?id=..., ?slug=..., ?card=..., ?kort=... eller #slug)
+  const [redirectParamId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      let id = params.get('id') || params.get('slug') || params.get('card') || params.get('kort');
+      if (!id && window.location.hash) {
+        const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
+        if (rawHash) {
+          const hp = new URLSearchParams(rawHash);
+          id = hp.get('id') || hp.get('slug') || rawHash;
+        }
+      }
+      return id ? id.trim() : null;
+    }
+    return null;
+  });
+  const [redirectStatus, setRedirectStatus] = useState<'loading' | 'success' | 'not_found'>('loading');
+  const [redirectTargetUrl, setRedirectTargetUrl] = useState<string>('');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Redigering av destinasjons-URL og Kort-ID
   const [editingItem, setEditingItem] = useState<RedirectItem | null>(null);
@@ -144,50 +165,135 @@ export default function App() {
     }
   };
 
-  // Last live redirects fra Supabase
+  // Last live redirects fra felles server (med automatisk synkronisering av eksisterende kort)
   const loadLiveRedirects = async () => {
-    const client = getSupabaseClient();
-    if (!client) {
-      loadMockFallback();
-      return;
-    }
     try {
-      const { data, error } = await client.from('redirects').select('*');
-      if (error) {
-        // Hvis API-nøkkelen i localStorage er ugyldig, prøv å falle tilbake til import.meta.env
-        const envUrl = import.meta.env.VITE_SUPABASE_URL;
-        const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        if (envUrl && envKey && !isPlaceholderConfig(envUrl, envKey) && (config.key !== envKey || config.url !== envUrl)) {
-          console.warn('Overstyrt Supabase-nøkkel feilet, gjenoppretter miljøvariabler...');
+      const res = await fetch('/api/redirects');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.items)) {
+          let mergedList = [...json.items];
+
+          // Sjekk om det finnes eksisterende kort i localStorage som må synkroniseres til serveren
           try {
-            localStorage.removeItem('supabase_config');
-          } catch (e) {}
-          setConfig(prev => ({ ...prev, url: envUrl, key: envKey }));
-          try {
-            const envClient = createClient(envUrl, envKey);
-            const retry = await envClient.from('redirects').select('*');
-            if (!retry.error && retry.data) {
-              applyRedirectData(retry.data);
-              setIsConnectedToSupabase(true);
-              return;
+            const localRaw = localStorage.getItem('mock_redirects');
+            if (localRaw) {
+              const localList: RedirectItem[] = JSON.parse(localRaw);
+              const missingOnServer = localList.filter(
+                localItem => !json.items.some((serverItem: RedirectItem) => serverItem.id.toLowerCase() === localItem.id.toLowerCase())
+              );
+              if (missingOnServer.length > 0) {
+                console.log('Synkroniserer lokale kort til felles server:', missingOnServer);
+                await fetch('/api/redirects', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ items: localList })
+                });
+                const refreshRes = await fetch('/api/redirects');
+                if (refreshRes.ok) {
+                  const refreshJson = await refreshRes.json();
+                  if (refreshJson.items) mergedList = refreshJson.items;
+                }
+              }
             }
-          } catch (err) {}
+          } catch (syncErr) {
+            console.warn('Lokal synk feilet:', syncErr);
+          }
+
+          applyRedirectData(mergedList);
+          return;
         }
-        console.warn('Supabase tilkoblingsvarsel:', error.message || error);
-        setIsConnectedToSupabase(false);
-        loadMockFallback();
-        return;
       }
-      if (data) {
-        applyRedirectData(data);
-        setIsConnectedToSupabase(true);
+    } catch (apiErr) {
+      console.warn('Server API ikke tilgjengelig, prøver Supabase/lokalt:', apiErr);
+    }
+
+    // Fallback: Hvis Supabase er tilkoblet
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { data, error } = await client.from('redirects').select('*');
+        if (!error && data) {
+          applyRedirectData(data);
+          setIsConnectedToSupabase(true);
+          return;
+        }
+      } catch (e) {}
+    }
+
+    loadMockFallback();
+  };
+
+  const handleSyncLocalToServer = async () => {
+    setIsSyncing(true);
+    try {
+      let itemsToSync = [...redirects];
+      const localRaw = localStorage.getItem('mock_redirects');
+      if (localRaw) {
+        const localList: RedirectItem[] = JSON.parse(localRaw);
+        for (const it of localList) {
+          if (!itemsToSync.some(r => r.id.toLowerCase() === it.id.toLowerCase())) {
+            itemsToSync.push(it);
+          }
+        }
       }
-    } catch (e: any) {
-      console.warn('Nettverksfeil mot Supabase:', e.message || e);
-      setIsConnectedToSupabase(false);
-      loadMockFallback();
+      const res = await fetch('/api/redirects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsToSync })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.items) {
+          applyRedirectData(json.items);
+        }
+        showToast(`Synkroniserte ${itemsToSync.length} kort til felles server!`);
+      } else {
+        showToast('Kunne ikke synkronisere til server');
+      }
+    } catch (e) {
+      showToast('Nettverksfeil ved synkronisering');
+    } finally {
+      setIsSyncing(false);
     }
   };
+
+  // Hvis siden åpnes via NFC på rot-URL (?id=... eller ?slug=...)
+  useEffect(() => {
+    if (!redirectParamId) return;
+    const clean = redirectParamId.trim().toLowerCase();
+    fetch(`/api/redirect/${encodeURIComponent(clean)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.item && data.item.google_url) {
+          let url = data.item.google_url;
+          if (!url.startsWith('http')) url = 'https://' + url;
+          setRedirectTargetUrl(url);
+          setRedirectStatus('success');
+          window.location.href = url;
+        } else {
+          try {
+            const raw = localStorage.getItem('mock_redirects');
+            if (raw) {
+              const list: RedirectItem[] = JSON.parse(raw);
+              const found = list.find(r => r.id.toLowerCase() === clean);
+              if (found && found.google_url) {
+                let url = found.google_url;
+                if (!url.startsWith('http')) url = 'https://' + url;
+                setRedirectTargetUrl(url);
+                setRedirectStatus('success');
+                window.location.href = url;
+                return;
+              }
+            }
+          } catch (e) {}
+          setRedirectStatus('not_found');
+        }
+      })
+      .catch(() => {
+        setRedirectStatus('not_found');
+      });
+  }, [redirectParamId]);
 
   // Last initielle data
   useEffect(() => {
@@ -199,7 +305,6 @@ export default function App() {
       let activeUrl = '';
       let activeKey = '';
 
-      // Prioriter alltid gyldige miljøvariabler hvis de finnes
       if (envUrl && envKey && !isPlaceholderConfig(envUrl, envKey)) {
         activeUrl = envUrl;
         activeKey = envKey;
@@ -308,31 +413,28 @@ export default function App() {
       return;
     }
 
+    // 1. Lagre på felles server API (umiddelbart tilgjengelig for alle telefoner)
+    try {
+      await fetch('/api/redirects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: slug, google_url: url, clicks: 0 })
+      });
+    } catch (apiErr) {
+      console.warn('Kunne ikke lagre til server:', apiErr);
+    }
+
+    // 2. Hvis Supabase er tilkoblet, lagre der også
     const client = getSupabaseClient();
     if (client) {
       try {
-        const { error } = await client
+        await client
           .from('redirects')
           .upsert({ id: slug, google_url: url }, { onConflict: 'id' });
-
-        if (error) {
-          showToast(`Feil fra Supabase: ${error.message}`);
-          return;
-        }
-
-        showToast(`Lagret "${slug}" direkte i Supabase!`);
-        await loadLiveRedirects();
-        setSelectedForCard({ id: slug, google_url: url, clicks: 0 });
-        setSlugInput('');
-        setUrlInput('');
-        return;
-      } catch (err: any) {
-        showToast(`Feil: ${err.message || 'Kunne ikke lagre'}`);
-        return;
-      }
+      } catch (err: any) {}
     }
 
-    // Fallback hvis Supabase ikke er tilkoblet
+    // 3. Oppdater lokal state og cache
     const existingIdx = redirects.findIndex(r => r.id === slug);
     let updated: RedirectItem[];
 
@@ -351,38 +453,48 @@ export default function App() {
         created_at: new Date().toISOString()
       };
       updated = [newItem, ...redirects];
-      showToast(`Opprettet ny omdirigering for "${slug}"`);
+      showToast(`Opprettet og lagret "${slug}" for alle telefoner!`);
       setSelectedForCard(newItem);
     }
 
     setRedirects(updated);
+    try {
+      localStorage.setItem('mock_redirects', JSON.stringify(updated));
+    } catch (e) {}
+
     setSlugInput('');
     setUrlInput('');
+    await loadLiveRedirects();
   };
 
   const handleDelete = async (id: string) => {
     if (confirm(`Er du sikker på at du vil slette omdirigeringen for "${id}"?`)) {
+      // 1. Slett fra felles server
+      try {
+        await fetch(`/api/redirects/${encodeURIComponent(id)}`, {
+          method: 'DELETE'
+        });
+      } catch (e) {}
+
+      // 2. Slett fra Supabase hvis tilkoblet
       const client = getSupabaseClient();
       if (client) {
         try {
-          const { error } = await client.from('redirects').delete().eq('id', id);
-          if (error) {
-            showToast(`Kunne ikke slette: ${error.message}`);
-            return;
-          }
-          showToast(`Slettet "${id}" fra Supabase!`);
-          await loadLiveRedirects();
-          return;
-        } catch (err: any) {
-          console.error(err);
-        }
+          await client.from('redirects').delete().eq('id', id);
+        } catch (err: any) {}
       }
+
+      // 3. Oppdater lokal state
       const updated = redirects.filter(r => r.id !== id);
       setRedirects(updated);
+      try {
+        localStorage.setItem('mock_redirects', JSON.stringify(updated));
+      } catch (e) {}
       if (selectedForCard?.id === id) {
         setSelectedForCard(updated[0] || null);
       }
       showToast(`Slettet "${id}"`);
+      await loadLiveRedirects();
     }
   };
 
@@ -429,19 +541,30 @@ export default function App() {
     }
 
     setIsSavingEdit(true);
+
+    // 1. Oppdater på felles server API (tilgjengelig for alle telefoner)
+    try {
+      await fetch(`/api/redirects/${encodeURIComponent(editingItem.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newId: newSlug, google_url: newUrl })
+      });
+    } catch (apiErr) {
+      console.warn('Feil ved server-oppdatering:', apiErr);
+    }
+
+    // 2. Oppdater i Supabase dersom tilkoblet
     const client = getSupabaseClient();
     if (client) {
       try {
         if (isIdChanged) {
-          // Forsøk å oppdatere ID direkte i Supabase
           const { error: updateErr } = await client
             .from('redirects')
             .update({ id: newSlug, google_url: newUrl })
             .eq('id', editingItem.id);
 
           if (updateErr) {
-            // Hvis update av primærnøkkel ikke tillates direkte, opprett ny rad med bevarte klikk og slett gammel
-            const { error: insertErr } = await client
+            await client
               .from('redirects')
               .insert({
                 id: newSlug,
@@ -449,45 +572,18 @@ export default function App() {
                 clicks: editingItem.clicks || 0,
                 created_at: editingItem.created_at || new Date().toISOString()
               });
-
-            if (insertErr) {
-              showToast(`Feil fra Supabase: ${insertErr.message}`);
-              setIsSavingEdit(false);
-              return;
-            }
-
             await client.from('redirects').delete().eq('id', editingItem.id);
           }
-          showToast(`Oppdaterte Kort-ID til "${newSlug}" og lenke i Supabase!`);
         } else {
-          const { error } = await client
+          await client
             .from('redirects')
             .update({ google_url: newUrl })
             .eq('id', editingItem.id);
-
-          if (error) {
-            showToast(`Feil fra Supabase: ${error.message}`);
-            setIsSavingEdit(false);
-            return;
-          }
-          showToast(`Destinasjon for "${editingItem.id}" er oppdatert i Supabase!`);
         }
-
-        await loadLiveRedirects();
-        if (selectedForCard?.id === editingItem.id) {
-          setSelectedForCard(prev => prev ? { ...prev, id: newSlug, google_url: newUrl } : null);
-        }
-        setIsSavingEdit(false);
-        closeEditModal();
-        return;
-      } catch (err: any) {
-        showToast(`Feil: ${err.message || 'Kunne ikke oppdatere'}`);
-        setIsSavingEdit(false);
-        return;
-      }
+      } catch (err: any) {}
     }
 
-    // Fallback hvis Supabase ikke er tilkoblet
+    // 3. Oppdater lokal state
     const updated = redirects.map(r => {
       if (r.id === editingItem.id) {
         return { ...r, id: newSlug, google_url: newUrl };
@@ -505,10 +601,12 @@ export default function App() {
     }
 
     showToast(isIdChanged
-      ? `Oppdaterte Kort-ID til "${newSlug}" og destinasjons-URL lokalt!`
-      : `Oppdaterte destinasjon for "${editingItem.id}" lokalt!`);
+      ? `Oppdaterte Kort-ID til "${newSlug}" og destinasjons-URL for alle!`
+      : `Oppdaterte destinasjon for "${editingItem.id}" for alle!`);
+
     setIsSavingEdit(false);
     closeEditModal();
+    await loadLiveRedirects();
   };
 
   const handleCopyLink = (id: string) => {
@@ -652,6 +750,80 @@ export default function App() {
   const totalClicks = redirects.reduce((sum, item) => sum + (item.clicks || 0), 0);
   const mostPopular = [...redirects].sort((a, b) => b.clicks - a.clicks)[0];
 
+  // 1. NFC / QR Omdirigering for besøkende (?id=... eller ?slug=...)
+  if (redirectParamId) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {redirectStatus === 'loading' && (
+          <div className="relative bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4 shadow-2xl backdrop-blur-xl">
+            <div className="w-12 h-12 border-3 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mx-auto" />
+            <h2 className="text-lg font-bold text-white tracking-tight">Kobler til omdirigering...</h2>
+            <p className="text-xs text-slate-400">
+              Videresender deg til Google Maps for <span className="text-sky-300 font-mono font-medium">{redirectParamId}</span>
+            </p>
+          </div>
+        )}
+
+        {redirectStatus === 'success' && (
+          <div className="relative bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg shadow-emerald-500/10">
+              <Check className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Omdirigert til Google Maps</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Kortet for <span className="text-sky-300 font-mono font-medium">{redirectParamId}</span> er aktivert.
+              </p>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  try { window.close(); } catch (e) {}
+                  try { self.close(); } catch (e) {}
+                  try { window.open('', '_self', ''); window.close(); } catch (e) {}
+                  if (window.history.length > 1) {
+                    try { window.history.back(); } catch (e) {}
+                  }
+                }}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-emerald-600/25 cursor-pointer min-h-[46px]"
+              >
+                Lukk denne fanen
+              </button>
+              <a
+                href={redirectTargetUrl}
+                className="block w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition text-center min-h-[40px] flex items-center justify-center"
+              >
+                Åpne i Google Maps igjen
+              </a>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Du kan nå trygt lukke denne fanen på telefonen din.
+            </p>
+          </div>
+        )}
+
+        {redirectStatus === 'not_found' && (
+          <div className="relative bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4 shadow-2xl backdrop-blur-xl">
+            <div className="w-12 h-12 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-xl font-bold">
+              !
+            </div>
+            <h2 className="text-lg font-bold text-white tracking-tight">Kort ikke funnet</h2>
+            <p className="text-xs text-slate-400">
+              Fant ingen registrert omdirigering for ID: <code className="text-amber-300 font-mono">{redirectParamId}</code>.
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Sjekk at kortet er registrert og lagret i kontrollpanelet.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (!isUnlocked) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4 relative overflow-hidden">
@@ -759,11 +931,11 @@ export default function App() {
                 <span className="hidden sm:inline">NFC & QR Redirect Engine</span>
               </h1>
               <div className="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 truncate">
-                <span className="hidden xs:inline">Supabase Live</span>
+                <span className="hidden xs:inline">Felles Server</span>
                 <span className="hidden xs:inline">·</span>
                 <span className="text-emerald-400 font-medium flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-                  Tilkoblet
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                  Aktiv for alle enheter
                 </span>
               </div>
             </div>
@@ -771,6 +943,16 @@ export default function App() {
 
           {/* Navigasjon */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <button
+              onClick={handleSyncLocalToServer}
+              disabled={isSyncing}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 border border-slate-700/80 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold min-h-[36px] cursor-pointer"
+              title="Synkroniser og sikkerhetskopier alle kort til felles server"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">Synk til server</span>
+            </button>
+
             <nav className="flex items-center gap-1 p-0.5 sm:p-1 bg-slate-950/70 rounded-xl border border-slate-800/80">
               <button
                 onClick={() => setActiveTab('dashboard')}

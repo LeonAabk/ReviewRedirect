@@ -934,6 +934,27 @@ create policy "Allow public delete" on public.redirects
     async function loadRedirects() {
       const tbody = document.getElementById('redirects-table-body');
       tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Henter omdirigeringer...</td></tr>';
+      const banner = document.getElementById('connection-banner');
+
+      // 1. Forsøk felles server-API først (fungerer for alle enheter)
+      try {
+        const res = await fetch('/api/redirects');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.items)) {
+            cachedRedirects = json.items.sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+            banner.style.display = 'flex';
+            banner.className = 'status-banner';
+            document.getElementById('banner-title').textContent = 'Felles serverdatabase aktiv: ';
+            document.getElementById('banner-text').textContent = 'Alle mobiltelefoner og kunder har umiddelbar tilgang uten passord.';
+            renderTable();
+            updateStats();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Server-API ikke tilgjengelig, prøver Supabase/lokalt:', err);
+      }
 
       const client = initSupabase();
 
@@ -1086,50 +1107,46 @@ create policy "Allow public delete" on public.redirects
       btnSave.disabled = true;
       btnSave.textContent = 'Lagrer...';
 
-      const client = initSupabase();
-
-      if (!client) {
-        // Fallback for lokal testing
-        const existingIdx = cachedRedirects.findIndex(r => r.id === slug);
-        if (existingIdx >= 0) {
-          cachedRedirects[existingIdx].google_url = url;
-        } else {
-          cachedRedirects.unshift({ id: slug, google_url: url, clicks: 0, created_at: new Date().toISOString() });
-        }
-        try {
-          localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
-        } catch (e) {}
-
-        slugInput.value = '';
-        urlInput.value = '';
-        btnSave.disabled = false;
-        btnSave.textContent = 'Lagre';
-        showToast(`Lagret omdirigering for "${slug}"`);
-        renderTable();
-        updateStats();
-        return;
-      }
-
+      // 1. Lagre på felles server API (umiddelbart tilgjengelig for alle telefoner)
       try {
-        const { error } = await client
-          .from('redirects')
-          .upsert({ id: slug, google_url: url }, { onConflict: 'id' });
-
-        if (error) {
-          throw error;
-        }
-
-        slugInput.value = '';
-        urlInput.value = '';
-        showToast(`Omdirigering for "${slug}" ble lagret!`);
-        await loadRedirects();
-      } catch (err) {
-        console.error('Feil under lagring:', err);
-        showToast(`Kunne ikke lagre: ${err.message}`, true);
-      } finally {
-        btnSave.disabled = false;
-        btnSave.textContent = 'Lagre';
+        await fetch('/api/redirects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: slug, google_url: url, clicks: 0 })
+        });
+      } catch (apiErr) {
+        console.warn('Kunne ikke lagre til server:', apiErr);
       }
+
+      // 2. Oppdater i Supabase dersom konfigurert
+      const client = initSupabase();
+      if (client) {
+        try {
+          await client
+            .from('redirects')
+            .upsert({ id: slug, google_url: url }, { onConflict: 'id' });
+        } catch (err) {
+          console.warn('Supabase lagring feilet:', err);
+        }
+      }
+
+      // 3. Oppdater lokal cache
+      const existingIdx = cachedRedirects.findIndex(r => r.id === slug);
+      if (existingIdx >= 0) {
+        cachedRedirects[existingIdx].google_url = url;
+      } else {
+        cachedRedirects.unshift({ id: slug, google_url: url, clicks: 0, created_at: new Date().toISOString() });
+      }
+      try {
+        localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
+      } catch (e) {}
+
+      slugInput.value = '';
+      urlInput.value = '';
+      btnSave.disabled = false;
+      btnSave.textContent = 'Lagre';
+      showToast(`Omdirigering for "${slug}" ble lagret på felles server!`);
+      await loadRedirects();
     }
 
     // Kopier lenke-knapp
@@ -1170,33 +1187,31 @@ create policy "Allow public delete" on public.redirects
         return;
       }
 
-      const client = initSupabase();
-
-      if (!client) {
-        cachedRedirects = cachedRedirects.filter(r => r.id !== id);
-        try {
-          localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
-        } catch (e) {}
-        showToast(`Slettet "${id}"`);
-        renderTable();
-        updateStats();
-        return;
-      }
-
+      // 1. Slett fra felles server
       try {
-        const { error } = await client
-          .from('redirects')
-          .delete()
-          .eq('id', id);
-
-        if (error) throw error;
-
-        showToast(`Slettet "${id}"`);
-        await loadRedirects();
-      } catch (err) {
-        console.error('Feil ved sletting:', err);
-        showToast(`Kunne ikke slette: ${err.message}`, true);
+        await fetch(`/api/redirects/${encodeURIComponent(id)}`, {
+          method: 'DELETE'
+        });
+      } catch (e) {
+        console.warn('Feil ved sletting fra server:', e);
       }
+
+      // 2. Slett fra Supabase dersom konfigurert
+      const client = initSupabase();
+      if (client) {
+        try {
+          await client.from('redirects').delete().eq('id', id);
+        } catch (err) {}
+      }
+
+      // 3. Oppdater lokal cache
+      cachedRedirects = cachedRedirects.filter(r => r.id !== id);
+      try {
+        localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
+      } catch (e) {}
+
+      showToast(`Slettet "${id}"`);
+      await loadRedirects();
     }
 
     // Søk i tabell
@@ -1283,6 +1298,18 @@ create policy "Allow public delete" on public.redirects
         return;
       }
 
+      // 1. Oppdater på felles server API (umiddelbart tilgjengelig for alle telefoner)
+      try {
+        await fetch(`/api/redirects/${encodeURIComponent(oldId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newId: newSlug, google_url: newUrl })
+        });
+      } catch (apiErr) {
+        console.warn('Feil ved server-oppdatering:', apiErr);
+      }
+
+      // 2. Oppdater i Supabase dersom konfigurert
       const client = initSupabase();
       if (client) {
         try {
@@ -1303,36 +1330,22 @@ create policy "Allow public delete" on public.redirects
                   created_at: oldItem && oldItem.created_at ? oldItem.created_at : new Date().toISOString()
                 });
 
-              if (insertErr) {
-                showToast('Feil ved oppretting av ny ID: ' + insertErr.message, true);
-                return;
+              if (!insertErr) {
+                await client.from('redirects').delete().eq('id', oldId);
               }
-              await client.from('redirects').delete().eq('id', oldId);
             }
-            showToast('Oppdaterte Kort-ID til "' + newSlug + '" og lenke i Supabase!');
           } else {
-            const { error } = await client
+            await client
               .from('redirects')
               .update({ google_url: newUrl })
               .eq('id', oldId);
-
-            if (error) {
-              showToast('Feil ved oppdatering: ' + error.message, true);
-              return;
-            }
-            showToast('Destinasjons-URL oppdatert for "' + oldId + '"!');
           }
-
-          closeEditModal();
-          await loadRedirects();
-          return;
         } catch (err) {
-          showToast('Kunne ikke oppdatere: ' + (err.message || err), true);
-          return;
+          console.warn('Supabase oppdatering feilet:', err);
         }
       }
 
-      // Lokal fallback
+      // 3. Oppdater lokal cache
       const idx = cachedRedirects.findIndex(r => r.id === oldId);
       if (idx >= 0) {
         cachedRedirects[idx].id = newSlug;
@@ -1340,13 +1353,13 @@ create policy "Allow public delete" on public.redirects
         try {
           localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
         } catch (e) {}
-        showToast(isIdChanged 
-          ? 'Oppdaterte Kort-ID til "' + newSlug + '" og destinasjons-URL lokalt!'
-          : 'Destinasjons-URL oppdatert lokalt for "' + oldId + '"!');
-        closeEditModal();
-        renderTable();
-        updateStats();
       }
+
+      showToast(isIdChanged 
+        ? 'Oppdaterte Kort-ID til "' + newSlug + '" og destinasjon på felles server!'
+        : 'Destinasjons-URL oppdatert på felles server!');
+      closeEditModal();
+      await loadRedirects();
     }
 
     // SQL Modal

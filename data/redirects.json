@@ -1,0 +1,92 @@
+[
+  {
+    "id": "kafe-hansen",
+    "google_url": "https://maps.app.goo.gl/kafe-hansen",
+    "clicks": 43,
+    "created_at": "2026-10-19T00:00:00.000Z"
+  },
+  {
+    "id": "oslo-barbershop",
+    "google_url": "https://g.page/r/oslo-barbershop/review",
+    "clicks": 128,
+    "created_at": "2026-10-19T00:00:00.000Z"
+  },
+  {
+    "id": "bakeri-nord",
+    "google_url": "https://maps.app.goo.gl/bakeri-nord",
+    "clicks": 15,
+    "created_at": "2026-10-19T00:00:00.000Z"
+  },
+  {
+    "id": "yummy-time-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJnUHKHgDhQUYRCj2aqsdR0gk",
+    "clicks": 10,
+    "created_at": "2026-10-19T12:00:58.816812+00:00"
+  },
+  {
+    "id": "out-of-bounds-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJWzdDqbLhQUYRmmYzjX0hVzg",
+    "clicks": 5,
+    "created_at": "2026-10-19T11:58:36.626737+00:00"
+  },
+  {
+    "id": "kaiogmattis-kafe-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJHVOgATzhQUYR2urIdW8dWK4",
+    "clicks": 0,
+    "created_at": "2026-10-19T11:48:52.545203+00:00"
+  },
+  {
+    "id": "olearys",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJS5um4zjhQUYRrvRhHYV-Aqo",
+    "clicks": 3,
+    "created_at": "2026-10-19T11:40:55.984762+00:00"
+  },
+  {
+    "id": "nagomi-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJR5kS4zjhQUYRqZah9cTXFf0",
+    "clicks": 2,
+    "created_at": "2026-10-19T11:39:00.085236+00:00"
+  },
+  {
+    "id": "peppes-pizza-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJIblgKDnhQUYRQqZFCL0YQWE",
+    "clicks": 2,
+    "created_at": "2026-10-19T11:36:42.250543+00:00"
+  },
+  {
+    "id": "pizzatia-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJsQsu3jjhQUYRX3C5kCfJwSw",
+    "clicks": 1,
+    "created_at": "2026-10-19T11:34:50.971385+00:00"
+  },
+  {
+    "id": "egon-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJR1wpdG3hQUYRRUIkp3s1y3o",
+    "clicks": 4,
+    "created_at": "2026-10-19T11:28:32.144626+00:00"
+  },
+  {
+    "id": "hygge-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJUfhwCevhQUYRS2XFdctKG5M",
+    "clicks": 4,
+    "created_at": "2026-10-19T11:27:24.936869+00:00"
+  },
+  {
+    "id": "larsen-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJwZGqSDnhQUYRTZypJefpIUM",
+    "clicks": 2,
+    "created_at": "2026-10-19T11:23:42.707002+00:00"
+  },
+  {
+    "id": "il-teatro",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJgxzb7-XhQUYRQHdVy-g9zJM",
+    "clicks": 27,
+    "created_at": "2026-10-09T18:48:13.070972+00:00"
+  },
+  {
+    "id": "heim-hamar",
+    "google_url": "https://search.google.com/local/writereview?placeid=ChIJpQj2YQ7hQUYR_AcTioAVh7I",
+    "clicks": 7,
+    "created_at": "2026-10-09T18:43:10.450506+00:00"
+  }
+]
