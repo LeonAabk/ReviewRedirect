@@ -27,12 +27,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm install
 
       - name: Build Vite application
+        env:
+          VITE_SUPABASE_URL: 'https://eqdxlbhupyvvfhoomliu.supabase.co'
+          VITE_SUPABASE_ANON_KEY: 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A'
         run: npm run build
 
       - name: Setup Pages
