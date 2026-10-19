@@ -24,7 +24,11 @@ import {
   Eye,
   EyeOff,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Pencil,
+  ArrowUpDown,
+  Globe,
+  Sparkles
 } from 'lucide-react';
 
 interface RedirectItem {
@@ -54,11 +58,17 @@ export default function App() {
   const [slugInput, setSlugInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'recent' | 'clicks' | 'name'>('recent');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isCopiedId, setIsCopiedId] = useState<string | null>(null);
   const [selectedForCard, setSelectedForCard] = useState<RedirectItem | null>(null);
   const [cardQrDataUrl, setCardQrDataUrl] = useState<string>('');
   const [isSimulatingNfc, setIsSimulatingNfc] = useState(false);
+
+  // Redigering av destinasjons-URL
+  const [editingItem, setEditingItem] = useState<RedirectItem | null>(null);
+  const [editUrlInput, setEditUrlInput] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Supabase konfigurasjon
   const [config, setConfig] = useState<SupabaseConfig>({
@@ -70,14 +80,66 @@ export default function App() {
     Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
   );
 
+  const isPlaceholderConfig = (u: string, k: string) => {
+    if (!u || !k) return true;
+    const lu = u.toLowerCase();
+    const lk = k.toLowerCase();
+    return lu.includes('ditt-prosjekt') || lu.includes('example') || lk.includes('din-offentlige') || lk.includes('din-anon') || lk === 'admin';
+  };
+
   // Hent aktiv Supabase klient
-  const getSupabaseClient = () => {
-    if (!config.url || !config.key || config.url.includes('DITT-PROSJEKT')) return null;
+  const getSupabaseClient = (overrideUrl?: string, overrideKey?: string) => {
+    const url = overrideUrl || config.url;
+    const key = overrideKey || config.key;
+    if (isPlaceholderConfig(url, key)) return null;
     try {
-      return createClient(config.url, config.key);
+      return createClient(url, key);
     } catch (e) {
-      console.error(e);
       return null;
+    }
+  };
+
+  const loadMockFallback = () => {
+    try {
+      const stored = localStorage.getItem('mock_redirects');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setRedirects(parsed);
+          setSelectedForCard(prev => prev || parsed[0]);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    const defaultData: RedirectItem[] = [
+      { id: 'kafe-hansen', google_url: 'https://maps.app.goo.gl/kafe-hansen', clicks: 42 },
+      { id: 'oslo-barbershop', google_url: 'https://g.page/r/oslo-barbershop/review', clicks: 128 },
+      { id: 'bakeri-nord', google_url: 'https://maps.app.goo.gl/bakeri-nord', clicks: 15 }
+    ];
+    setRedirects(defaultData);
+    setSelectedForCard(prev => prev || defaultData[0]);
+    try {
+      localStorage.setItem('mock_redirects', JSON.stringify(defaultData));
+    } catch (e) {}
+  };
+
+  const applyRedirectData = (data: RedirectItem[]) => {
+    const sorted = data.sort((a, b) => {
+      if (a.created_at && b.created_at) {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      return (a.id || '').localeCompare(b.id || '');
+    });
+    setRedirects(sorted);
+    try {
+      localStorage.setItem('mock_redirects', JSON.stringify(sorted));
+    } catch (e) {}
+    if (sorted.length > 0) {
+      setSelectedForCard(prev => {
+        if (!prev) return sorted[0];
+        return sorted.find(s => s.id === prev.id) || sorted[0];
+      });
     }
   };
 
@@ -85,64 +147,75 @@ export default function App() {
   const loadLiveRedirects = async () => {
     const client = getSupabaseClient();
     if (!client) {
-      try {
-        const stored = localStorage.getItem('mock_redirects');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setRedirects(parsed);
-            if (!selectedForCard) setSelectedForCard(parsed[0]);
-          }
-        }
-      } catch (e) {}
+      loadMockFallback();
       return;
     }
     try {
       const { data, error } = await client.from('redirects').select('*');
       if (error) {
-        console.error('Supabase query error:', error);
+        // Hvis API-nøkkelen i localStorage er ugyldig, prøv å falle tilbake til import.meta.env
+        const envUrl = import.meta.env.VITE_SUPABASE_URL;
+        const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (envUrl && envKey && !isPlaceholderConfig(envUrl, envKey) && (config.key !== envKey || config.url !== envUrl)) {
+          console.warn('Overstyrt Supabase-nøkkel feilet, gjenoppretter miljøvariabler...');
+          try {
+            localStorage.removeItem('supabase_config');
+          } catch (e) {}
+          setConfig(prev => ({ ...prev, url: envUrl, key: envKey }));
+          try {
+            const envClient = createClient(envUrl, envKey);
+            const retry = await envClient.from('redirects').select('*');
+            if (!retry.error && retry.data) {
+              applyRedirectData(retry.data);
+              setIsConnectedToSupabase(true);
+              return;
+            }
+          } catch (err) {}
+        }
+        console.warn('Supabase tilkoblingsvarsel:', error.message || error);
+        setIsConnectedToSupabase(false);
+        loadMockFallback();
         return;
       }
       if (data) {
-        const sorted = data.sort((a, b) => {
-          if (a.created_at && b.created_at) {
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          }
-          return (a.id || '').localeCompare(b.id || '');
-        });
-        setRedirects(sorted);
-        // Sync til localStorage mock_redirects så r.html har siste oppdaterte data
-        try {
-          localStorage.setItem('mock_redirects', JSON.stringify(sorted));
-        } catch (e) {}
-        if (sorted.length > 0) {
-          setSelectedForCard(prev => {
-            if (!prev) return sorted[0];
-            return sorted.find(s => s.id === prev.id) || sorted[0];
-          });
-        }
+        applyRedirectData(data);
+        setIsConnectedToSupabase(true);
       }
-    } catch (e) {
-      console.error('Failed to load from Supabase:', e);
+    } catch (e: any) {
+      console.warn('Nettverksfeil mot Supabase:', e.message || e);
+      setIsConnectedToSupabase(false);
+      loadMockFallback();
     }
   };
 
   // Last initielle data
   useEffect(() => {
-    // Last config
     try {
-      const storedConfig = localStorage.getItem('supabase_config');
       const customDomain = localStorage.getItem('custom_domain') || '';
+      const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
       let activeUrl = '';
       let activeKey = '';
 
-      if (storedConfig) {
-        const parsed = JSON.parse(storedConfig);
-        activeUrl = parsed.url || import.meta.env.VITE_SUPABASE_URL || '';
-        activeKey = parsed.key || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-      } else if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        activeUrl = import.meta.env.VITE_SUPABASE_URL;
-        activeKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      // Prioriter alltid gyldige miljøvariabler hvis de finnes
+      if (envUrl && envKey && !isPlaceholderConfig(envUrl, envKey)) {
+        activeUrl = envUrl;
+        activeKey = envKey;
+        try {
+          localStorage.setItem('supabase_config', JSON.stringify({ url: activeUrl, key: activeKey }));
+        } catch (e) {}
+      } else {
+        const storedConfig = localStorage.getItem('supabase_config');
+        if (storedConfig) {
+          try {
+            const parsed = JSON.parse(storedConfig);
+            if (parsed.url && parsed.key && !isPlaceholderConfig(parsed.url, parsed.key)) {
+              activeUrl = parsed.url;
+              activeKey = parsed.key;
+            }
+          } catch (e) {}
+        }
       }
 
       setConfig({
@@ -151,12 +224,8 @@ export default function App() {
         customDomain: customDomain || ''
       });
 
-      if (activeUrl && activeKey) {
+      if (activeUrl && activeKey && !isPlaceholderConfig(activeUrl, activeKey)) {
         setIsConnectedToSupabase(true);
-        // Sikre at supabase_config ligger i localStorage så r.html og admin.html har tilgang
-        try {
-          localStorage.setItem('supabase_config', JSON.stringify({ url: activeUrl, key: activeKey }));
-        } catch (e) {}
       } else {
         setIsConnectedToSupabase(false);
       }
@@ -316,6 +385,83 @@ export default function App() {
     }
   };
 
+  const openEditModal = (item: RedirectItem) => {
+    setEditingItem(item);
+    setEditUrlInput(item.google_url);
+  };
+
+  const closeEditModal = () => {
+    setEditingItem(null);
+    setEditUrlInput('');
+    setIsSavingEdit(false);
+  };
+
+  const handleUpdateRedirect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    let newUrl = editUrlInput.trim();
+    if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+      newUrl = 'https://' + newUrl;
+    }
+
+    if (!newUrl) {
+      showToast('Destinasjons-URL kan ikke være tom');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { error } = await client
+          .from('redirects')
+          .update({ google_url: newUrl })
+          .eq('id', editingItem.id);
+
+        if (error) {
+          showToast(`Feil fra Supabase: ${error.message}`);
+          setIsSavingEdit(false);
+          return;
+        }
+
+        showToast(`Destinasjon for "${editingItem.id}" er oppdatert i Supabase!`);
+        await loadLiveRedirects();
+        if (selectedForCard?.id === editingItem.id) {
+          setSelectedForCard(prev => prev ? { ...prev, google_url: newUrl } : null);
+        }
+        setIsSavingEdit(false);
+        closeEditModal();
+        return;
+      } catch (err: any) {
+        showToast(`Feil: ${err.message || 'Kunne ikke oppdatere'}`);
+        setIsSavingEdit(false);
+        return;
+      }
+    }
+
+    // Fallback hvis Supabase ikke er tilkoblet
+    const updated = redirects.map(r => {
+      if (r.id === editingItem.id) {
+        return { ...r, google_url: newUrl };
+      }
+      return r;
+    });
+
+    setRedirects(updated);
+    try {
+      localStorage.setItem('mock_redirects', JSON.stringify(updated));
+    } catch (e) {}
+
+    if (selectedForCard?.id === editingItem.id) {
+      setSelectedForCard({ ...selectedForCard, google_url: newUrl });
+    }
+
+    showToast(`Oppdaterte destinasjon for "${editingItem.id}" lokalt!`);
+    setIsSavingEdit(false);
+    closeEditModal();
+  };
+
   const handleCopyLink = (id: string) => {
     const url = buildFullUrl(id);
     navigator.clipboard.writeText(url).then(() => {
@@ -376,8 +522,12 @@ export default function App() {
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    const currentPassword = localStorage.getItem('admin_password') || 'admin';
-    if (enteredPassword.trim() === currentPassword.trim()) {
+    const currentPassword = (localStorage.getItem('admin_password') || 'admin').trim();
+    const cleanEntered = enteredPassword.trim();
+    const isMatch = cleanEntered === currentPassword ||
+      (currentPassword.toLowerCase() === 'admin' && cleanEntered.toLowerCase() === 'admin');
+
+    if (isMatch) {
       setIsUnlocked(true);
       sessionStorage.setItem('dashboard_unlocked', 'true');
       setPasswordError(false);
@@ -431,11 +581,24 @@ export default function App() {
     }, 700);
   };
 
-  const filteredRedirects = redirects.filter(item => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return item.id.toLowerCase().includes(term) || item.google_url.toLowerCase().includes(term);
-  });
+  const filteredRedirects = redirects
+    .filter(item => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return item.id.toLowerCase().includes(term) || item.google_url.toLowerCase().includes(term);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'clicks') {
+        return (b.clicks || 0) - (a.clicks || 0);
+      }
+      if (sortBy === 'name') {
+        return a.id.localeCompare(b.id);
+      }
+      if (a.created_at && b.created_at) {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      return a.id.localeCompare(b.id);
+    });
 
   const totalClicks = redirects.reduce((sum, item) => sum + (item.clicks || 0), 0);
   const mostPopular = [...redirects].sort((a, b) => b.clicks - a.clicks)[0];
@@ -480,6 +643,9 @@ export default function App() {
                     setPasswordError(false);
                   }}
                   autoFocus
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="Skriv inn passord..."
                   required
                   className={`w-full bg-slate-950 border ${
@@ -687,6 +853,15 @@ export default function App() {
                     Lagre
                   </button>
                 </div>
+
+                {slugInput.trim() && redirects.some(r => r.id.toLowerCase() === slugInput.trim().toLowerCase()) && (
+                  <div className="md:col-span-12 text-xs text-amber-300 bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-lg flex items-center gap-2">
+                    <Pencil className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                    <span>
+                      Merk: Kunde-ID «<strong className="text-white font-mono">{slugInput.trim()}</strong>» finnes fra før. Ved å trykke <strong>Lagre</strong> oppdateres destinasjons-URL-en for dette kortet.
+                    </span>
+                  </div>
+                )}
               </form>
             </section>
 
@@ -694,24 +869,53 @@ export default function App() {
             <section className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                    Registrerte omdirigeringer i Supabase
-                  </h2>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                      Registrerte NFC-kort & omdirigeringer
+                    </h2>
+                    <span className="text-[11px] font-mono bg-slate-800 text-sky-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-semibold">
+                      {filteredRedirects.length} {filteredRedirects.length === 1 ? 'kort' : 'kort'}
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                    Oversikt over alle aktive koder, destinasjoner og klikk-teller.
+                    Full oversikt over hvor hvert enkelt kort omdirigerer. Trykk «Rediger» for å endre måladresse når som helst.
                   </p>
                 </div>
 
-                <div className="w-full sm:w-auto">
-                  <div className="relative w-full">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {/* Sortering */}
+                  <div className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(e: any) => setSortBy(e.target.value)}
+                      className="bg-slate-950 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-slate-300 focus:outline-none focus:border-sky-500 min-h-[40px] sm:min-h-0 cursor-pointer font-medium"
+                      title="Sorter omdirigeringer"
+                    >
+                      <option value="recent">Nyeste først</option>
+                      <option value="clicks">Flest klikk</option>
+                      <option value="name">Kort-ID (A-Å)</option>
+                    </select>
+                  </div>
+
+                  {/* Søk */}
+                  <div className="relative flex-1 sm:w-56">
                     <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Søk i ID eller lenke..."
-                      className="bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-3.5 py-2 text-base sm:text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 w-full sm:w-56 transition min-h-[40px] sm:min-h-0"
+                      placeholder="Søk i kort og URL..."
+                      className="bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-8 py-2 text-base sm:text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 w-full transition min-h-[40px] sm:min-h-0"
                     />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-0.5 cursor-pointer"
+                        title="Tøm søk"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -739,67 +943,87 @@ export default function App() {
                         </span>
                       </div>
 
-                      {/* Destinasjonslenke */}
-                      <div>
+                      {/* Destinasjonslenke med Endre-knapp */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>Sender brukeren til:</span>
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="text-amber-400 hover:text-amber-300 font-medium inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Endre URL</span>
+                          </button>
+                        </div>
                         <a
                           href={item.google_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="hover:text-white hover:underline flex items-center gap-1.5 text-xs text-slate-300 break-all bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80"
+                          className="hover:text-white hover:underline flex items-center gap-1.5 text-xs text-slate-300 break-all bg-slate-900/80 p-2.5 rounded-lg border border-slate-800"
                         >
                           <ExternalLink className="w-3.5 h-3.5 shrink-0 text-sky-400" />
                           <span className="truncate">{item.google_url}</span>
                         </a>
                       </div>
 
-                      {/* Handlingsknapper på mobil (tommelvennlig 2x2 rutenett) */}
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/60">
+                      {/* Handlingsknapper på mobil */}
+                      <div className="space-y-2 pt-1 border-t border-slate-800/60">
                         <button
-                          onClick={() => handleCopyLink(item.id)}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition min-h-[40px] cursor-pointer"
+                          onClick={() => openEditModal(item)}
+                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/30 text-xs font-bold text-amber-300 border border-amber-500/30 transition min-h-[42px] cursor-pointer"
                         >
-                          {isCopiedId === item.id ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="text-emerald-400">Kopiert!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Kopier lenke</span>
-                            </>
-                          )}
+                          <Pencil className="w-4 h-4 text-amber-400" />
+                          <span>Rediger destinasjons-URL</span>
                         </button>
 
-                        <button
-                          onClick={() => {
-                            setSelectedForCard(item);
-                            setActiveTab('nfc');
-                          }}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-slate-700 text-xs font-medium text-purple-300 border border-slate-700 transition min-h-[40px] cursor-pointer"
-                        >
-                          <QrIcon className="w-3.5 h-3.5" />
-                          <span>QR & Kort</span>
-                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleCopyLink(item.id)}
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition min-h-[40px] cursor-pointer"
+                          >
+                            {isCopiedId === item.id ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-emerald-400">Kopiert!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Kopier lenke</span>
+                              </>
+                            )}
+                          </button>
 
-                        <a
-                          href={buildFullUrl(item.id)}
-                          onClick={(e) => handleTestRedirect(e, item)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-950/60 active:bg-sky-900 text-xs font-semibold text-sky-300 border border-sky-800/60 transition min-h-[40px] cursor-pointer"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Test</span>
-                        </a>
+                          <button
+                            onClick={() => {
+                              setSelectedForCard(item);
+                              setActiveTab('nfc');
+                            }}
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-slate-700 text-xs font-medium text-purple-300 border border-slate-700 transition min-h-[40px] cursor-pointer"
+                          >
+                            <QrIcon className="w-3.5 h-3.5" />
+                            <span>QR & Kort</span>
+                          </button>
 
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-red-950/60 text-xs font-medium text-red-400 border border-slate-700 active:border-red-800 transition min-h-[40px] cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Slett</span>
-                        </button>
+                          <a
+                            href={buildFullUrl(item.id)}
+                            onClick={(e) => handleTestRedirect(e, item)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-950/60 active:bg-sky-900 text-xs font-semibold text-sky-300 border border-sky-800/60 transition min-h-[40px] cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Test</span>
+                          </a>
+
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 active:bg-red-950/60 text-xs font-medium text-red-400 border border-slate-700 active:border-red-800 transition min-h-[40px] cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Slett</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -831,20 +1055,38 @@ export default function App() {
                             {item.id}
                           </td>
                           <td className="py-3.5 px-4 max-w-xs sm:max-w-md truncate text-slate-300">
-                            <a
-                              href={item.google_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:text-white hover:underline flex items-center gap-1.5 text-xs text-slate-300"
-                            >
-                              <span className="truncate">{item.google_url}</span>
-                              <ExternalLink className="w-3 h-3 shrink-0 text-slate-500" />
-                            </a>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={item.google_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:text-white hover:underline flex items-center gap-1.5 text-xs text-slate-300 truncate"
+                              >
+                                <span className="truncate">{item.google_url}</span>
+                                <ExternalLink className="w-3 h-3 shrink-0 text-slate-500" />
+                              </a>
+                              <button
+                                onClick={() => openEditModal(item)}
+                                className="text-slate-500 hover:text-amber-400 p-1 rounded transition cursor-pointer shrink-0"
+                                title="Rediger URL"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono font-bold text-white tabular-nums">
                             {item.clicks || 0}
                           </td>
                           <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 text-xs font-semibold text-amber-300 border border-amber-500/30 transition cursor-pointer"
+                              title="Rediger destinasjons-URL for dette kortet"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Rediger</span>
+                            </button>
+
                             <button
                               onClick={() => handleCopyLink(item.id)}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition cursor-pointer"
@@ -1006,9 +1248,26 @@ export default function App() {
                       <div className="font-mono text-xs text-sky-400 bg-slate-900 p-2.5 rounded-lg border border-slate-800 break-all">
                         {buildFullUrl(selectedForCard.id)}
                       </div>
-                      <div className="text-xs text-slate-400 break-all">
-                        Mål: <span className="text-slate-200">{selectedForCard.google_url}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-slate-400 break-all truncate">
+                          Mål: <span className="text-slate-200">{selectedForCard.google_url}</span>
+                        </div>
+                        <button
+                          onClick={() => openEditModal(selectedForCard)}
+                          className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold border border-amber-500/30 flex items-center gap-1 shrink-0 cursor-pointer"
+                          title="Endre hvor dette kortet omdirigerer"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Endre mål</span>
+                        </button>
                       </div>
+                      <button
+                        onClick={() => openEditModal(selectedForCard)}
+                        className="w-full py-2.5 px-3 bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/30 border border-amber-500/30 rounded-lg text-amber-300 text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer min-h-[38px]"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Rediger destinasjons-URL for dette kortet</span>
+                      </button>
                     </div>
 
                     {/* Simuleringsknapp */}
@@ -1170,6 +1429,127 @@ export default function App() {
                     className="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition shadow-lg shadow-sky-600/20 min-h-[40px] cursor-pointer"
                   >
                     Lagre Innstillinger
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT REDIRECT MODAL */}
+        {editingItem && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg p-5 sm:p-7 shadow-2xl space-y-5 sm:space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                    <Pencil className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-white">
+                      Rediger destinasjons-URL
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Endre hvor NFC-kortet og QR-koden omdirigerer
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeEditModal}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Informasjonsboks om fast slug */}
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400">Fast NFC-Slug / Kort-ID:</span>
+                  <span className="font-mono text-xs font-bold text-sky-400 bg-sky-950/50 px-2 py-0.5 rounded border border-sky-800/40">
+                    {editingItem.id}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 leading-relaxed">
+                  💡 <strong className="text-slate-300">Dynamisk omdirigering:</strong> Fysiske NFC-brikker eller QR-koder programmert med denne ID-en trenger <span className="text-sky-300 font-medium">ikke programmeres på nytt</span>. Så snart du lagrer den nye lenken under, vil alle kort umiddelbart omdirigere til det nye stedet.
+                </div>
+                <div className="text-[11px] font-mono text-slate-500 truncate">
+                  Fast kortlenke: {buildFullUrl(editingItem.id)}
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateRedirect} className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-200">
+                      Ny Destinasjons-URL (hvor kortet skal sende brukeren)
+                    </label>
+                    {editUrlInput && (
+                      <a
+                        href={editUrlInput.startsWith('http') ? editUrlInput : `https://${editUrlInput}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Test denne lenken
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    value={editUrlInput}
+                    onChange={(e) => setEditUrlInput(e.target.value)}
+                    placeholder="https://maps.app.goo.gl/..."
+                    required
+                    autoFocus
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition min-h-[46px]"
+                  />
+                </div>
+
+                {/* Hurtigvalg / Hurtigforslag */}
+                <div>
+                  <span className="text-[11px] text-slate-400 block mb-1.5 font-medium">Hurtigeksempler:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditUrlInput('https://maps.app.goo.gl/')}
+                      className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition cursor-pointer"
+                    >
+                      Google Maps Review
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditUrlInput('https://instagram.com/')}
+                      className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition cursor-pointer"
+                    >
+                      Instagram
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditUrlInput('https://www.google.com/maps/search/?api=1&query=')}
+                      className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition cursor-pointer"
+                    >
+                      Google Søk
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-semibold transition cursor-pointer min-h-[42px]"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-bold transition shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
+                  >
+                    <Check className="w-4 h-4" />
+                    {isSavingEdit ? 'Lagrer i Supabase...' : 'Lagre endring'}
                   </button>
                 </div>
               </form>

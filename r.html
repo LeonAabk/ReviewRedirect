@@ -291,18 +291,31 @@
     const SUPABASE_ANON_KEY = '';
     // =========================================================================
 
+    function isPlaceholder(url, key) {
+      if (!url || !key) return true;
+      const u = (url || '').toLowerCase();
+      const k = (key || '').toLowerCase();
+      return u.includes('ditt-prosjekt') || u.includes('example') || k.includes('din-offentlige') || k.includes('din-anon') || k === 'admin';
+    }
+
     // Hjelpefunksjon for å hente lagret config (dersom satt via admin/lokal lagring for rask testing)
     function getActiveCredentials() {
+      // 1. Prioriter server-injiserte nøkler hvis de er gyldige og ikke placeholders
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && !isPlaceholder(SUPABASE_URL, SUPABASE_ANON_KEY)) {
+        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
+      }
+
+      // 2. Sjekk localStorage
       try {
         const local = localStorage.getItem('supabase_config');
         if (local) {
           const parsed = JSON.parse(local);
-          if (parsed.url && parsed.key) return parsed;
+          if (parsed.url && parsed.key && !isPlaceholder(parsed.url, parsed.key)) {
+            return parsed;
+          }
         }
       } catch (e) {}
-      if (SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('DITT-PROSJEKT')) {
-        return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
-      }
+
       return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isDefault: true };
     }
 
@@ -453,10 +466,25 @@
           .maybeSingle();
 
         if (error) {
-          console.error('Supabase query error:', error);
+          console.warn('Supabase tilkoblingsvarsel:', error.message || error);
+          // Forsøk lokal fallback i tilfelle API-nøkkel feilet
+          try {
+            const localData = localStorage.getItem('mock_redirects');
+            if (localData) {
+              const list = JSON.parse(localData);
+              const found = list.find(item => item.id.toLowerCase() === cleanId.toLowerCase());
+              if (found && found.google_url) {
+                found.clicks = (found.clicks || 0) + 1;
+                localStorage.setItem('mock_redirects', JSON.stringify(list));
+                performRedirectAndClose(found.google_url);
+                return;
+              }
+            }
+          } catch (e) {}
+
           showError(
-            'Databasefeil',
-            `Det oppstod en feil ved oppslag i databasen: <br><span class="error-badge">${error.message}</span>`
+            'Tilkoblingsfeil',
+            `Kunne ikke koble til databasen. Sjekk at Supabase-nøklene i Dashboard er oppdatert.`
           );
           return;
         }
