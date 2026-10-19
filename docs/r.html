@@ -319,34 +319,21 @@
       return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY, isDefault: true };
     }
 
-    // Hjelpefunksjon for å forsøke å lukke omdirigeringsfanen
+    // Hjelpefunksjon for å lukke fanen dersom brukeren trykker på lukk-knappen
     function closeCurrentTab() {
       try {
         window.close();
       } catch (e) {}
-      try {
-        self.close();
-      } catch (e) {}
-      try {
-        window.open('', '_self', '');
-        window.close();
-      } catch (e) {}
-      // Fallback: hvis brukeren har historikk i samme fane, gå tilbake
-      if (window.history.length > 1) {
-        try {
-          window.history.back();
-        } catch (e) {}
-      }
     }
 
-    // Utfører omdirigeringen, oppdaterer UI og forsøker å lukke fanen
+    // Utfører omdirigeringen og oppdaterer UI
     function performRedirectAndClose(url) {
       let targetUrl = (url || '').trim();
       if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
         targetUrl = 'https://' + targetUrl;
       }
 
-      // 1. Skjul spinner og vis suksess-kort (i tilfelle fanen blir stående i nettleseren)
+      // 1. Skjul spinner og vis suksess-kort (med direkte lenke og lukk-knapp)
       const loader = document.getElementById('loader');
       if (loader) loader.style.display = 'none';
 
@@ -355,39 +342,18 @@
       if (reopenBtn) reopenBtn.href = targetUrl;
       if (successCard) successCard.style.display = 'block';
 
-      // 2. Lytt etter når mobilen overleverer fokus til Google Maps-appen
-      window.addEventListener('pagehide', closeCurrentTab);
-      window.addEventListener('blur', closeCurrentTab);
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          closeCurrentTab();
-        }
-      });
-
-      // 3. Utfør selve omdirigeringen
-      // Vi bruker window.location.href slik at operativsystemet/nettleseren fanger opp app-lenken
-      window.location.href = targetUrl;
-
-      // 4. Forsøk å lukke fanen automatisk etter at omdirigeringen er sendt
-      setTimeout(closeCurrentTab, 350);
-      setTimeout(closeCurrentTab, 1000);
-      setTimeout(closeCurrentTab, 2500);
-
-      // 5. Visuell nedtelling i kortet dersom nettleserens sikkerhetspolicy blokkerer automatisk lukking
-      let timeLeft = 3;
       const countdownEl = document.getElementById('close-countdown');
-      const countdownInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft <= 0) {
-          clearInterval(countdownInterval);
-          if (countdownEl) {
-            countdownEl.textContent = 'Du kan nå trygt lukke denne fanen.';
-          }
-          closeCurrentTab();
-        } else if (countdownEl) {
-          countdownEl.textContent = `Lukker fanen automatisk (${timeLeft}s)...`;
-        }
-      }, 1000);
+      if (countdownEl) {
+        countdownEl.textContent = 'Videresender deg til Google Maps...';
+      }
+
+      // 2. Utfør selve omdirigeringen direkte
+      // Vi bruker location.replace slik at kunden ikke havner i en tilbake-løkke
+      try {
+        window.location.replace(targetUrl);
+      } catch (e) {
+        window.location.href = targetUrl;
+      }
     }
 
     // Vis feilskjerm
