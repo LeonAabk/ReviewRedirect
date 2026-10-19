@@ -428,17 +428,17 @@
 
       const cleanId = redirectId.trim().toLowerCase();
 
-      // 2. FØRSTE PRIORITET: Pre-injisert felles server-database (lynraskt, 0ms forsinkelse)
-      if (typeof window !== 'undefined' && Array.isArray((window as any).__SERVER_REDIRECTS__)) {
-        const preloaded = (window as any).__SERVER_REDIRECTS__.find(
-          (item: any) => item && item.id && item.id.toLowerCase() === cleanId
-        );
+      // 2. FØRSTE PRIORITET: Pre-injisert felles server-database (lynraskt, 0ms forsinkelse dersom kjørt via server.ts)
+      if (typeof window !== 'undefined' && Array.isArray(window.__SERVER_REDIRECTS__)) {
+        const preloaded = window.__SERVER_REDIRECTS__.find(function(item) {
+          return item && item.id && item.id.toLowerCase() === cleanId;
+        });
         if (preloaded && preloaded.google_url) {
           try {
             if (navigator.sendBeacon) {
-              navigator.sendBeacon(`/api/click/${encodeURIComponent(cleanId)}`);
+              navigator.sendBeacon('/api/click/' + encodeURIComponent(cleanId));
             } else {
-              fetch(`/api/click/${encodeURIComponent(cleanId)}`, { method: 'POST', keepalive: true }).catch(() => {});
+              fetch('/api/click/' + encodeURIComponent(cleanId), { method: 'POST', keepalive: true }).catch(function() {});
             }
           } catch (e) {}
           performRedirectAndClose(preloaded.google_url);
@@ -446,10 +446,32 @@
         }
       }
 
-      // 3. ANDRE PRIORITET: Direkte oppslag mot felles server-API (/api/redirect/:id)
-      // Fungerer universelt for ALLE mobiltelefoner og kunder uten innlogging eller nøkler!
+      // 3. ANDRE PRIORITET: Supabase (direkte oppslag i skyen for alle enheter)
+      const creds = getActiveCredentials();
+      if (creds && creds.url && creds.key && !isPlaceholder(creds.url, creds.key) && typeof supabase !== 'undefined' && supabase.createClient) {
+        try {
+          const client = supabase.createClient(creds.url, creds.key);
+          const res = await client
+            .from('redirects')
+            .select('id, google_url, clicks')
+            .ilike('id', cleanId)
+            .maybeSingle();
+
+          if (!res.error && res.data && res.data.google_url) {
+            try {
+              client.from('redirects').update({ clicks: (Number(res.data.clicks) || 0) + 1 }).eq('id', res.data.id).then(function() {});
+            } catch (e) {}
+            performRedirectAndClose(res.data.google_url);
+            return;
+          }
+        } catch (e) {
+          console.warn('Supabase oppslag feilet:', e);
+        }
+      }
+
+      // 4. TREDJE PRIORITET: Direkte oppslag mot felles server-API (/api/redirect/:id) dersom server kjører
       try {
-        const res = await fetch(`/api/redirect/${encodeURIComponent(cleanId)}`);
+        const res = await fetch('/api/redirect/' + encodeURIComponent(cleanId));
         if (res.ok) {
           const json = await res.json();
           if (json && json.success && json.item && json.item.google_url) {
@@ -458,30 +480,7 @@
           }
         }
       } catch (err) {
-        console.warn('Server API utilgjengelig, prøver reserve-kilder:', err);
-      }
-
-      // 4. TREDJE PRIORITET: Supabase (dersom konfigurert med gyldige nøkler)
-      const creds = getActiveCredentials();
-      if (!creds.isDefault && creds.url && creds.key && typeof supabase !== 'undefined' && (supabase as any).createClient) {
-        try {
-          const client = (supabase as any).createClient(creds.url, creds.key);
-          const { data, error } = await client
-            .from('redirects')
-            .select('id, google_url, clicks')
-            .ilike('id', cleanId)
-            .maybeSingle();
-
-          if (!error && data && data.google_url) {
-            try {
-              client.from('redirects').update({ clicks: (Number(data.clicks) || 0) + 1 }).eq('id', data.id);
-            } catch (e) {}
-            performRedirectAndClose(data.google_url);
-            return;
-          }
-        } catch (e) {
-          console.warn('Supabase oppslag feilet:', e);
-        }
+        // Ignorer på statisk hosting
       }
 
       // 5. FJERDE PRIORITET: Lokal lagring / cache
@@ -489,7 +488,9 @@
         const localData = localStorage.getItem('mock_redirects');
         if (localData) {
           const list = JSON.parse(localData);
-          const found = list.find((item: any) => item.id.toLowerCase() === cleanId);
+          const found = list.find(function(item) {
+            return item && item.id && item.id.toLowerCase() === cleanId;
+          });
           if (found && found.google_url) {
             found.clicks = (found.clicks || 0) + 1;
             localStorage.setItem('mock_redirects', JSON.stringify(list));
