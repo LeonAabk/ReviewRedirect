@@ -622,6 +622,13 @@
             Lagre
           </button>
         </div>
+
+        <div style="margin-top: 0.6rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;">
+          <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">Hurtigeksempler:</span>
+          <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; color: #fbbf24; border-color: rgba(245, 158, 11, 0.4);" onclick="document.getElementById('input-url').value='https://search.google.com/local/writereview?placeid=DIN_PLACE_ID_HER'">Google WriteReview (Place ID)</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;" onclick="document.getElementById('input-url').value='https://maps.app.goo.gl/'">Google Maps Review</button>
+          <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;" onclick="document.getElementById('input-url').value='https://instagram.com/'">Instagram</button>
+        </div>
       </form>
     </section>
 
@@ -709,29 +716,44 @@ create policy "Allow public delete" on public.redirects
     </div>
   </div>
 
-  <!-- Modal: Rediger Destinasjons-URL -->
+  <!-- Modal: Rediger Kort-ID & Destinasjons-URL -->
   <div id="modal-edit" class="modal-overlay">
-    <div class="modal-card" style="max-width: 480px;">
+    <div class="modal-card" style="max-width: 500px;">
       <div class="modal-header">
-        <h3 class="section-title">Rediger destinasjons-URL</h3>
+        <h3 class="section-title">Rediger Kort-ID & Destinasjon</h3>
         <button class="modal-close" onclick="closeEditModal()">&times;</button>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 1.25rem;">
-        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.25rem;">Fast NFC-Kort ID (slug):</div>
-        <div id="edit-modal-slug" style="font-family: monospace; font-size: 1rem; font-weight: 700; color: #38bdf8;">kafe-hansen</div>
-        <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.35rem; line-height: 1.4;">
-          💡 <strong>Dynamisk omdirigering:</strong> Fysiske kort med denne ID-en trenger ikke brennes på nytt. Så snart du lagrer, omdirigeres de umiddelbart til den nye adressen.
-        </p>
       </div>
 
       <form onsubmit="handleEditSubmit(event)">
-        <div class="input-group" style="margin-bottom: 1.25rem;">
-          <label class="input-label" for="edit-url-input">Ny Destinasjons-URL (Google Review, nettside etc.)</label>
-          <input type="url" id="edit-url-input" class="input-field" placeholder="https://maps.app.goo.gl/..." required autofocus />
+        <!-- Kort-ID / Navn -->
+        <div class="input-group" style="margin-bottom: 1rem;">
+          <label class="input-label" for="edit-slug-input">Kort-ID / Navn (slug)</label>
+          <input type="text" id="edit-slug-input" class="input-field mono" placeholder="f.eks. kafe-hansen" required />
+          <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.35rem; line-height: 1.4; background: rgba(15, 23, 42, 0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            💡 <strong>Tips:</strong> Hvis du endrer selve <strong>Kort-ID</strong>-en, oppdateres også kortets faste lenke. Hvis du allerede har fysiske kort med den gamle ID-en, kan du beholde den og kun endre <strong>Destinasjons-URL</strong> under.
+          </div>
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+
+        <!-- Destinasjons-URL -->
+        <div class="input-group" style="margin-bottom: 0.75rem;">
+          <label class="input-label" for="edit-url-input">Ny Destinasjons-URL (hvor kortet skal sende brukeren)</label>
+          <input type="url" id="edit-url-input" class="input-field" placeholder="https://search.google.com/local/writereview?placeid=..." required />
+        </div>
+
+        <!-- Hurtigeksempler -->
+        <div style="margin-bottom: 1.25rem;">
+          <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.4rem; font-weight: 500;">Hurtigeksempler:</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+            <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; color: #fbbf24; border-color: rgba(245, 158, 11, 0.4);" onclick="document.getElementById('edit-url-input').value='https://search.google.com/local/writereview?placeid=DIN_PLACE_ID_HER'">Google WriteReview (Place ID)</button>
+            <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;" onclick="document.getElementById('edit-url-input').value='https://maps.app.goo.gl/'">Google Maps Review</button>
+            <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;" onclick="document.getElementById('edit-url-input').value='https://instagram.com/'">Instagram</button>
+            <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;" onclick="document.getElementById('edit-url-input').value='https://www.google.com/maps/search/?api=1&query='">Google Søk</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.85rem;">
           <button type="button" class="btn-secondary" onclick="closeEditModal()">Avbryt</button>
-          <button type="submit" class="btn-primary" style="background: #f59e0b; color: #0f172a; font-weight: 700;">Lagre endring</button>
+          <button type="submit" id="btn-save-edit" class="btn-primary" style="background: #f59e0b; color: #0f172a; font-weight: 700;">Lagre endringer</button>
         </div>
       </form>
     </div>
@@ -1218,11 +1240,11 @@ create policy "Allow public delete" on public.redirects
       const item = cachedRedirects.find(r => r.id === id);
       if (!item) return;
       currentEditingId = id;
-      document.getElementById('edit-modal-slug').textContent = item.id;
+      document.getElementById('edit-slug-input').value = item.id;
       document.getElementById('edit-url-input').value = item.google_url;
       document.getElementById('modal-edit').style.display = 'flex';
       setTimeout(() => {
-        document.getElementById('edit-url-input').focus();
+        document.getElementById('edit-slug-input').focus();
       }, 50);
     }
 
@@ -1235,24 +1257,72 @@ create policy "Allow public delete" on public.redirects
       e.preventDefault();
       if (!currentEditingId) return;
 
+      const oldId = currentEditingId;
+      let newSlug = document.getElementById('edit-slug-input').value.trim().toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-_]/g, '');
+
+      if (!newSlug) {
+        showToast('Kort-ID / slug kan ikke være tom', true);
+        return;
+      }
+
       let newUrl = document.getElementById('edit-url-input').value.trim();
       if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
         newUrl = 'https://' + newUrl;
       }
 
+      if (!newUrl) {
+        showToast('Destinasjons-URL kan ikke være tom', true);
+        return;
+      }
+
+      const isIdChanged = newSlug !== oldId;
+      if (isIdChanged && cachedRedirects.some(r => r.id.toLowerCase() === newSlug.toLowerCase())) {
+        showToast('Kort-ID "' + newSlug + '" er allerede i bruk. Velg en annen.', true);
+        return;
+      }
+
       const client = initSupabase();
       if (client) {
         try {
-          const { error } = await client
-            .from('redirects')
-            .update({ google_url: newUrl })
-            .eq('id', currentEditingId);
+          if (isIdChanged) {
+            const { error: updateErr } = await client
+              .from('redirects')
+              .update({ id: newSlug, google_url: newUrl })
+              .eq('id', oldId);
 
-          if (error) {
-            showToast('Feil ved oppdatering: ' + error.message, true);
-            return;
+            if (updateErr) {
+              const oldItem = cachedRedirects.find(r => r.id === oldId);
+              const { error: insertErr } = await client
+                .from('redirects')
+                .insert({
+                  id: newSlug,
+                  google_url: newUrl,
+                  clicks: oldItem ? (oldItem.clicks || 0) : 0,
+                  created_at: oldItem && oldItem.created_at ? oldItem.created_at : new Date().toISOString()
+                });
+
+              if (insertErr) {
+                showToast('Feil ved oppretting av ny ID: ' + insertErr.message, true);
+                return;
+              }
+              await client.from('redirects').delete().eq('id', oldId);
+            }
+            showToast('Oppdaterte Kort-ID til "' + newSlug + '" og lenke i Supabase!');
+          } else {
+            const { error } = await client
+              .from('redirects')
+              .update({ google_url: newUrl })
+              .eq('id', oldId);
+
+            if (error) {
+              showToast('Feil ved oppdatering: ' + error.message, true);
+              return;
+            }
+            showToast('Destinasjons-URL oppdatert for "' + oldId + '"!');
           }
-          showToast('Destinasjons-URL oppdatert for "' + currentEditingId + '"!');
+
           closeEditModal();
           await loadRedirects();
           return;
@@ -1263,13 +1333,16 @@ create policy "Allow public delete" on public.redirects
       }
 
       // Lokal fallback
-      const item = cachedRedirects.find(r => r.id === currentEditingId);
-      if (item) {
-        item.google_url = newUrl;
+      const idx = cachedRedirects.findIndex(r => r.id === oldId);
+      if (idx >= 0) {
+        cachedRedirects[idx].id = newSlug;
+        cachedRedirects[idx].google_url = newUrl;
         try {
           localStorage.setItem('mock_redirects', JSON.stringify(cachedRedirects));
         } catch (e) {}
-        showToast('Destinasjons-URL oppdatert lokalt for "' + currentEditingId + '"!');
+        showToast(isIdChanged 
+          ? 'Oppdaterte Kort-ID til "' + newSlug + '" og destinasjons-URL lokalt!'
+          : 'Destinasjons-URL oppdatert lokalt for "' + oldId + '"!');
         closeEditModal();
         renderTable();
         updateStats();

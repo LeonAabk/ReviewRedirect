@@ -65,8 +65,9 @@ export default function App() {
   const [cardQrDataUrl, setCardQrDataUrl] = useState<string>('');
   const [isSimulatingNfc, setIsSimulatingNfc] = useState(false);
 
-  // Redigering av destinasjons-URL
+  // Redigering av destinasjons-URL og Kort-ID
   const [editingItem, setEditingItem] = useState<RedirectItem | null>(null);
+  const [editSlugInput, setEditSlugInput] = useState('');
   const [editUrlInput, setEditUrlInput] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -387,11 +388,13 @@ export default function App() {
 
   const openEditModal = (item: RedirectItem) => {
     setEditingItem(item);
+    setEditSlugInput(item.id);
     setEditUrlInput(item.google_url);
   };
 
   const closeEditModal = () => {
     setEditingItem(null);
+    setEditSlugInput('');
     setEditUrlInput('');
     setIsSavingEdit(false);
   };
@@ -399,6 +402,15 @@ export default function App() {
   const handleUpdateRedirect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
+
+    let newSlug = editSlugInput.trim().toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-_]/g, '');
+
+    if (!newSlug) {
+      showToast('Kort-ID / slug kan ikke være tom');
+      return;
+    }
 
     let newUrl = editUrlInput.trim();
     if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
@@ -410,25 +422,60 @@ export default function App() {
       return;
     }
 
+    const isIdChanged = newSlug !== editingItem.id;
+    if (isIdChanged && redirects.some(r => r.id.toLowerCase() === newSlug.toLowerCase())) {
+      showToast(`Kort-ID "${newSlug}" finnes allerede. Velg en annen.`);
+      return;
+    }
+
     setIsSavingEdit(true);
     const client = getSupabaseClient();
     if (client) {
       try {
-        const { error } = await client
-          .from('redirects')
-          .update({ google_url: newUrl })
-          .eq('id', editingItem.id);
+        if (isIdChanged) {
+          // Forsøk å oppdatere ID direkte i Supabase
+          const { error: updateErr } = await client
+            .from('redirects')
+            .update({ id: newSlug, google_url: newUrl })
+            .eq('id', editingItem.id);
 
-        if (error) {
-          showToast(`Feil fra Supabase: ${error.message}`);
-          setIsSavingEdit(false);
-          return;
+          if (updateErr) {
+            // Hvis update av primærnøkkel ikke tillates direkte, opprett ny rad med bevarte klikk og slett gammel
+            const { error: insertErr } = await client
+              .from('redirects')
+              .insert({
+                id: newSlug,
+                google_url: newUrl,
+                clicks: editingItem.clicks || 0,
+                created_at: editingItem.created_at || new Date().toISOString()
+              });
+
+            if (insertErr) {
+              showToast(`Feil fra Supabase: ${insertErr.message}`);
+              setIsSavingEdit(false);
+              return;
+            }
+
+            await client.from('redirects').delete().eq('id', editingItem.id);
+          }
+          showToast(`Oppdaterte Kort-ID til "${newSlug}" og lenke i Supabase!`);
+        } else {
+          const { error } = await client
+            .from('redirects')
+            .update({ google_url: newUrl })
+            .eq('id', editingItem.id);
+
+          if (error) {
+            showToast(`Feil fra Supabase: ${error.message}`);
+            setIsSavingEdit(false);
+            return;
+          }
+          showToast(`Destinasjon for "${editingItem.id}" er oppdatert i Supabase!`);
         }
 
-        showToast(`Destinasjon for "${editingItem.id}" er oppdatert i Supabase!`);
         await loadLiveRedirects();
         if (selectedForCard?.id === editingItem.id) {
-          setSelectedForCard(prev => prev ? { ...prev, google_url: newUrl } : null);
+          setSelectedForCard(prev => prev ? { ...prev, id: newSlug, google_url: newUrl } : null);
         }
         setIsSavingEdit(false);
         closeEditModal();
@@ -443,7 +490,7 @@ export default function App() {
     // Fallback hvis Supabase ikke er tilkoblet
     const updated = redirects.map(r => {
       if (r.id === editingItem.id) {
-        return { ...r, google_url: newUrl };
+        return { ...r, id: newSlug, google_url: newUrl };
       }
       return r;
     });
@@ -454,10 +501,12 @@ export default function App() {
     } catch (e) {}
 
     if (selectedForCard?.id === editingItem.id) {
-      setSelectedForCard({ ...selectedForCard, google_url: newUrl });
+      setSelectedForCard({ ...selectedForCard, id: newSlug, google_url: newUrl });
     }
 
-    showToast(`Oppdaterte destinasjon for "${editingItem.id}" lokalt!`);
+    showToast(isIdChanged
+      ? `Oppdaterte Kort-ID til "${newSlug}" og destinasjons-URL lokalt!`
+      : `Oppdaterte destinasjon for "${editingItem.id}" lokalt!`);
     setIsSavingEdit(false);
     closeEditModal();
   };
@@ -851,6 +900,31 @@ export default function App() {
                   >
                     <Plus className="w-4 h-4" />
                     Lagre
+                  </button>
+                </div>
+
+                <div className="md:col-span-12 flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[11px] text-slate-400 font-medium">Hurtigeksempler for URL:</span>
+                  <button
+                    type="button"
+                    onClick={() => setUrlInput('https://search.google.com/local/writereview?placeid=DIN_PLACE_ID_HER')}
+                    className="px-2.5 py-1 rounded-md bg-amber-950/40 hover:bg-amber-900/40 text-[11px] text-amber-300 border border-amber-700/50 transition cursor-pointer font-medium"
+                  >
+                    Google WriteReview (Place ID)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUrlInput('https://maps.app.goo.gl/')}
+                    className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition cursor-pointer"
+                  >
+                    Google Maps Review
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUrlInput('https://instagram.com/')}
+                    className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition cursor-pointer"
+                  >
+                    Instagram
                   </button>
                 </div>
 
@@ -1439,7 +1513,7 @@ export default function App() {
         {/* EDIT REDIRECT MODAL */}
         {editingItem && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg p-5 sm:p-7 shadow-2xl space-y-5 sm:space-y-6">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg p-5 sm:p-7 shadow-2xl space-y-5 sm:space-y-6 max-h-[92vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
@@ -1447,10 +1521,10 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-bold text-white">
-                      Rediger destinasjons-URL
+                      Rediger Kort-ID & Destinasjon
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Endre hvor NFC-kortet og QR-koden omdirigerer
+                      Endre kortnavn/ID og hvor NFC-kortet omdirigerer
                     </p>
                   </div>
                 </div>
@@ -1462,23 +1536,31 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Informasjonsboks om fast slug */}
-              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Fast NFC-Slug / Kort-ID:</span>
-                  <span className="font-mono text-xs font-bold text-sky-400 bg-sky-950/50 px-2 py-0.5 rounded border border-sky-800/40">
-                    {editingItem.id}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 leading-relaxed">
-                  💡 <strong className="text-slate-300">Dynamisk omdirigering:</strong> Fysiske NFC-brikker eller QR-koder programmert med denne ID-en trenger <span className="text-sky-300 font-medium">ikke programmeres på nytt</span>. Så snart du lagrer den nye lenken under, vil alle kort umiddelbart omdirigere til det nye stedet.
-                </div>
-                <div className="text-[11px] font-mono text-slate-500 truncate">
-                  Fast kortlenke: {buildFullUrl(editingItem.id)}
-                </div>
-              </div>
-
               <form onSubmit={handleUpdateRedirect} className="space-y-4">
+                {/* Rediger Kort-ID / Navn */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-200">
+                      Kort-ID / Navn (slug)
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]">
+                      {buildFullUrl(editSlugInput.trim() || editingItem.id)}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={editSlugInput}
+                    onChange={(e) => setEditSlugInput(e.target.value)}
+                    placeholder="f.eks. kafe-hansen"
+                    required
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition min-h-[46px]"
+                  />
+                  <div className="mt-2 text-[11px] text-slate-400 leading-relaxed bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+                    💡 <strong className="text-slate-300">Tips:</strong> Hvis du endrer selve <strong>Kort-ID</strong>-en, oppdateres også kortets faste nettadresse. Hvis du allerede har programmert fysiske NFC-kort med <code className="text-sky-300 font-mono">{editingItem.id}</code>, kan du beholde samme Kort-ID og kun endre <strong>Destinasjons-URL</strong> under slik at de umiddelbart peker til det nye stedet.
+                  </div>
+                </div>
+
+                {/* Rediger Destinasjons-URL */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-semibold text-slate-200">
@@ -1500,9 +1582,8 @@ export default function App() {
                     type="url"
                     value={editUrlInput}
                     onChange={(e) => setEditUrlInput(e.target.value)}
-                    placeholder="https://maps.app.goo.gl/..."
+                    placeholder="https://search.google.com/local/writereview?placeid=..."
                     required
-                    autoFocus
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition min-h-[46px]"
                   />
                 </div>
@@ -1511,6 +1592,13 @@ export default function App() {
                 <div>
                   <span className="text-[11px] text-slate-400 block mb-1.5 font-medium">Hurtigeksempler:</span>
                   <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditUrlInput('https://search.google.com/local/writereview?placeid=DIN_PLACE_ID_HER')}
+                      className="px-2.5 py-1 rounded-md bg-amber-950/40 hover:bg-amber-900/40 text-[11px] text-amber-300 border border-amber-700/50 transition cursor-pointer font-medium"
+                    >
+                      Google WriteReview (Place ID)
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditUrlInput('https://maps.app.goo.gl/')}
@@ -1549,7 +1637,7 @@ export default function App() {
                     className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-bold transition shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[42px]"
                   >
                     <Check className="w-4 h-4" />
-                    {isSavingEdit ? 'Lagrer i Supabase...' : 'Lagre endring'}
+                    {isSavingEdit ? 'Lagrer i Supabase...' : 'Lagre endringer'}
                   </button>
                 </div>
               </form>
