@@ -23,19 +23,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
       - name: Build Vite application
         env:
           VITE_SUPABASE_URL: 'https://eqdxlbhupyvvfhoomliu.supabase.co'
           VITE_SUPABASE_ANON_KEY: 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A'
-        run: npm run build
+        run: bun run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
