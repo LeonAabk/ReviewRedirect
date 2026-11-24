@@ -279,7 +279,6 @@
     <p class="error-desc" id="error-desc">
       Denne NFC- eller QR-koden er ikke registrert eller har utløpt.
     </p>
-    <a href="admin.html" class="btn-return">Gå til Dashboard</a>
     <div id="config-hint" class="config-note" style="display: none;"></div>
   </div>
 
@@ -425,7 +424,7 @@
 
           if (!res.error && res.data && res.data.google_url) {
             try {
-              client.from('redirects').update({ clicks: (Number(res.data.clicks) || 0) + 1 }).eq('id', res.data.id).then(function() {});
+              client.rpc('increment_click', { card_id: res.data.id }).then(function() {});
             } catch (e) {}
             performRedirectAndClose(res.data.google_url);
             return;

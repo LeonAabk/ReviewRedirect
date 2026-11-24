@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   QrCode as QrIcon,
   Trash2,
@@ -42,6 +42,18 @@ interface RedirectItem {
 const DEFAULT_SUPABASE_URL = 'https://eqdxlbhupyvvfhoomliu.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_o7wt9THRQ8XQ2JNnw0a-Bg_aV4dWz9A';
 
+// Én klient per prosjekt, slik at innloggingen deles i hele appen
+const clientCache = new Map<string, SupabaseClient>();
+function getCachedClient(url: string, key: string): SupabaseClient {
+  const cacheKey = url + '|' + key;
+  let client = clientCache.get(cacheKey);
+  if (!client) {
+    client = createClient(url, key);
+    clientCache.set(cacheKey, client);
+  }
+  return client;
+}
+
 interface SupabaseConfig {
   url: string;
   key: string;
@@ -53,8 +65,8 @@ export default function App() {
   const [enteredPassword, setEnteredPassword] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('admin');
-  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
+  const [enteredEmail, setEnteredEmail] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'nfc'>('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -137,7 +149,7 @@ export default function App() {
     const key = overrideKey || config.key || DEFAULT_SUPABASE_ANON_KEY;
     if (isPlaceholderConfig(url, key)) return null;
     try {
-      return createClient(url, key);
+      return getCachedClient(url, key);
     } catch (e) {
       return null;
     }
@@ -336,7 +348,7 @@ export default function App() {
               setRedirectTargetUrl(url);
               setRedirectStatus('success');
               try {
-                await client.from('redirects').update({ clicks: (Number(data.clicks) || 0) + 1 }).eq('id', data.id);
+                await client.rpc('increment_click', { card_id: data.id });
               } catch (e) {}
               window.location.href = url;
               return;
@@ -410,10 +422,13 @@ export default function App() {
       setIsConnectedToSupabase(Boolean(activeUrl && activeKey && !isPlaceholderConfig(activeUrl, activeKey)));
 
       // Last admin-passord og sesjonsstatus
-      const savedPassword = localStorage.getItem('admin_password') || 'admin';
-      setAdminPassword(savedPassword);
-      const isSessionUnlocked = sessionStorage.getItem('dashboard_unlocked') === 'true';
-      setIsUnlocked(isSessionUnlocked);
+      // Gammelt nettleserpassord er erstattet av Supabase-innlogging
+      localStorage.removeItem('admin_password');
+      sessionStorage.removeItem('dashboard_unlocked');
+      const authClient = getSupabaseClient(activeUrl, activeKey);
+      authClient?.auth.getSession().then(({ data }) => {
+        setIsUnlocked(Boolean(data.session));
+      });
     } catch (e) {
       console.error(e);
     }
@@ -732,37 +747,44 @@ export default function App() {
     } else {
       localStorage.removeItem('custom_domain');
     }
-    if (adminPassword) {
-      localStorage.setItem('admin_password', adminPassword.trim());
-    }
     setIsSettingsOpen(false);
     showToast('Innstillinger lagret!');
     loadLiveRedirects();
   };
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentPassword = (localStorage.getItem('admin_password') || 'admin').trim();
-    const cleanEntered = enteredPassword.trim();
-    const isMatch = cleanEntered === currentPassword ||
-      (currentPassword.toLowerCase() === 'admin' && cleanEntered.toLowerCase() === 'admin');
+    const client = getSupabaseClient();
+    if (!client) {
+      setPasswordError(true);
+      return;
+    }
+    setIsLoggingIn(true);
+    const { error } = await client.auth.signInWithPassword({
+      email: enteredEmail.trim(),
+      password: enteredPassword
+    });
+    setIsLoggingIn(false);
 
-    if (isMatch) {
+    if (!error) {
       setIsUnlocked(true);
-      sessionStorage.setItem('dashboard_unlocked', 'true');
       setPasswordError(false);
       setEnteredPassword('');
-      showToast('Dashboard låst opp!');
+      showToast('Logget inn!');
+      loadLiveRedirects();
     } else {
       setPasswordError(true);
       setTimeout(() => setPasswordError(false), 2500);
     }
   };
 
-  const handleLock = () => {
+  const handleLock = async () => {
+    const client = getSupabaseClient();
+    try {
+      await client?.auth.signOut();
+    } catch (e) {}
     setIsUnlocked(false);
-    sessionStorage.removeItem('dashboard_unlocked');
-    showToast('Dashboard låst.');
+    showToast('Logget ut.');
   };
 
   const simulateNfcTap = async () => {
@@ -772,10 +794,7 @@ export default function App() {
     const client = getSupabaseClient();
     if (client) {
       try {
-        await client
-          .from('redirects')
-          .update({ clicks: (selectedForCard.clicks || 0) + 1 })
-          .eq('id', selectedForCard.id);
+        await client.rpc('increment_click', { card_id: selectedForCard.id });
       } catch (e) {
         console.error('Kunne ikke oppdatere klikk i Supabase:', e);
       }
@@ -919,14 +938,33 @@ export default function App() {
             </div>
             <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">Privat Administrasjon</h1>
             <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-              NFC & QR Redirect Engine er låst. Oppgi ditt admin-passord for å åpne kontrollpanelet.
+              Logg inn med admin-brukeren din i Supabase for å åpne kontrollpanelet.
             </p>
           </div>
 
           <form onSubmit={handleUnlock} className="space-y-4">
             <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">E-post</label>
+              <input
+                type="email"
+                value={enteredEmail}
+                onChange={(e) => {
+                  setEnteredEmail(e.target.value);
+                  setPasswordError(false);
+                }}
+                autoFocus
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="din@epost.no"
+                required
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-base sm:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition min-h-[46px]"
+              />
+            </div>
+            <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-300">Admin-passord</label>
+                <label className="text-xs font-semibold text-slate-300">Passord</label>
               </div>
               <div className="relative">
                 <input
@@ -936,7 +974,7 @@ export default function App() {
                     setEnteredPassword(e.target.value);
                     setPasswordError(false);
                   }}
-                  autoFocus
+                  autoComplete="current-password"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
@@ -957,17 +995,18 @@ export default function App() {
               </div>
               {passwordError && (
                 <p className="text-xs text-red-400 mt-2 flex items-center gap-1.5 animate-shake">
-                  <span>Feil passord. Prøv igjen.</span>
+                  <span>Feil e-post eller passord. Prøv igjen.</span>
                 </p>
               )}
             </div>
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 active:from-sky-700 active:to-sky-600 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
+              disabled={isLoggingIn}
+              className="w-full py-3.5 disabled:opacity-60 disabled:cursor-wait bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 active:from-sky-700 active:to-sky-600 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2 min-h-[46px] cursor-pointer"
             >
               <KeyRound className="w-4 h-4" />
-              Lås opp Dashboard
+              {isLoggingIn ? 'Logger inn...' : 'Logg inn'}
             </button>
           </form>
 
@@ -1699,35 +1738,6 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-300">
-                      Privat Admin-passord
-                    </label>
-                    <span className="text-[11px] text-slate-500 font-mono">Låser dashboardet</span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showSettingsPassword ? 'text' : 'password'}
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      placeholder="Ditt hemmelige passord..."
-                      required
-                      className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-base sm:text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 pr-10 transition min-h-[42px]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSettingsPassword(!showSettingsPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition p-1"
-                      title={showSettingsPassword ? 'Skjul passord' : 'Vis passord'}
-                    >
-                      {showSettingsPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Passordet som kreves for å åpne dette kontrollpanelet.
-                  </p>
-                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
