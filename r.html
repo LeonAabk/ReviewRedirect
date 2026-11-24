@@ -325,6 +325,27 @@
       } catch (e) {}
     }
 
+    // Teller ett trykk. keepalive gjør at forespørselen fullføres selv om siden byttes,
+    // og vi venter maks 800 ms slik at kunden aldri merker forsinkelse.
+    function countClick(creds, cardId) {
+      try {
+        const request = fetch(creds.url + '/rest/v1/rpc/increment_click', {
+          method: 'POST',
+          keepalive: true,
+          headers: {
+            'apikey': creds.key,
+            'Authorization': 'Bearer ' + creds.key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ card_id: cardId })
+        }).catch(function() {});
+        const timeout = new Promise(function(resolve) { setTimeout(resolve, 800); });
+        return Promise.race([request, timeout]);
+      } catch (e) {
+        return Promise.resolve();
+      }
+    }
+
     // Utfører omdirigeringen og oppdaterer UI
     function performRedirectAndClose(url) {
       let targetUrl = (url || '').trim();
@@ -423,9 +444,7 @@
             .maybeSingle();
 
           if (!res.error && res.data && res.data.google_url) {
-            try {
-              client.rpc('increment_click', { card_id: res.data.id }).then(function() {});
-            } catch (e) {}
+            await countClick(creds, res.data.id);
             performRedirectAndClose(res.data.google_url);
             return;
           }
